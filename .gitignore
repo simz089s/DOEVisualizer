@@ -2,3 +2,6 @@
 .idea/
 MetalAnalysisReport.iml
 res/
+*.sql
+*.db
+*.odb
