@@ -21,16 +21,18 @@ def get_MAP_ADI_RET():
         return df
 
 
-def put_MAP_ADI_RET_db(df):
-    with myed.connect_db() as conn:
-        # df.to_sql('MAP_DATA_ADI_RETAINED_AUSTENITE', con=conn, if_exists='append', index=True, index_label='ID', chunksize=10000)
-        df.to_sql('MAP_DATA_ADI_RETAINED_AUSTENITE', con=conn, if_exists='replace', index=True, index_label='ID', chunksize=10000)
-        myed.print_table(conn, "MAP_DATA_ADI_RETAINED_AUSTENITE", 10)
+def put_MAP_ADI_RET_db(conn, df):
+    # df.to_sql('MAP_DATA_ADI_RETAINED_AUSTENITE', con=conn, if_exists='append', index=True, index_label='ID', chunksize=10000)
+    df.to_sql('MAP_DATA_ADI_RETAINED_AUSTENITE', con=conn, if_exists='replace', index=True, index_label='ID', chunksize=10000)
+    myed.print_table(conn, "MAP_DATA_ADI_RETAINED_AUSTENITE", 10)
 
 
 def main():
-    df = get_MAP_ADI_RET()
-    put_MAP_ADI_RET_db(df)
+    with myed.connect_db() as conn:
+        df = get_MAP_ADI_RET()
+        put_MAP_ADI_RET_db(conn, df)
+        df = mypd.sqldb_to_df(conn, "select * from MAP_DATA_ADI_RETAINED_AUSTENITE;")
+        print(df)
     return
 
 if __name__ == "__main__":

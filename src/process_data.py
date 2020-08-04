@@ -1,3 +1,4 @@
+import sqlite3
 import numpy as np
 import scipy as sp
 import pandas as pd
@@ -6,8 +7,11 @@ import pandas as pd
 # import torch
 
 
-def build_tables(raw_data):
-    return (0,)
+def sqldb_to_df(conn, query="", table=""):
+    if table:# and conn is sqlalchemy
+        return pd.read_sql_table(table, conn)
+    elif query:
+        return pd.read_sql_query(query, conn, index_col="ID")
 
 
 def fishbone(data):
