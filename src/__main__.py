@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import io
+import os, io
 from itertools import combinations
 import numpy as np
 import scipy as sp
@@ -14,11 +14,14 @@ import extract_data as myed
 import process_data as mypd
 
 
+dirname = os.path.dirname(os.path.abspath(__file__))
+
+
 def get_MAP_ADI_RET():
-    with io.open("../res/datasets/dataset_info.txt", "r", encoding="utf-8") as file:
+    with io.open(os.path.join(dirname, "..", "res", "datasets", "dataset_info.txt"), "r", encoding="utf-8") as file:
         filename = file.readline().strip()
         cols = file.readline().strip().split(",")
-        df = myed.extract_csv("../res/datasets/"+filename, " ", cols, None)
+        df = myed.extract_csv(os.path.join(dirname, "..", "res", "datasets", filename), " ", cols, None)
         print(df)
         return df
 
@@ -40,7 +43,7 @@ def graph_pairs(df):
 
 
 def main():
-    with myed.connect_db() as conn:
+    with myed.connect_db(os.path.join(dirname, "..", "db.db")) as conn:
         df = get_MAP_ADI_RET()
         # put_MAP_ADI_RET_db(conn, df)
         df = mypd.sqldb_to_df(conn, "select * from MAP_DATA_ADI_RETAINED_AUSTENITE;")
