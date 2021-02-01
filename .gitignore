@@ -6,3 +6,11 @@ res/
 *.db
 *.odb
 *.pyc
+*.obj
+*.pdb
+*.exe
+*.lib
+*.dll
+.dub/
+dub.selections.json
+*.def
