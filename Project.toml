@@ -1,0 +1,9 @@
+authors = ["S Z <someone@email.com>"]
+name = "MetalAnalysisReport"
+uuid = "2d0b7fc2-8e2c-414b-aa02-4942dc8346b8"
+version = "0.0.1"
+
+# [deps]
+
+# [compat]
+# # julia = "1.1"

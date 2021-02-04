@@ -1,12 +1,12 @@
 {
 	"authors": [
-		"SZ",
+		"SZ"
 	],
 	"copyright": "Copyright © 2021, SZ",
 	"dependencies": {
         "excel-d": "*",
         "mir": "*",
-        "xlsxd": "*",
+        "xlsxd": "*"
 	},
 	"description": "Metal Analysis Report",
 	"license": "MIT",
@@ -17,7 +17,7 @@
     "configurations": [
         {
             "name": "xll",
-            "preBuildCommands": [ "dub run -c def --nodeps -q -- metalanalysisreport.def" ],
+            "preBuildCommands": [ "dub run --compiler=ldc2 -c def --nodeps -q -- metalanalysisreport.def" ],
             "sourceFiles": [ "metalanalysisreport.def" ],
             "libs": [ "xlcall32" ],
             "postBuildCommands": [ "copy /y metalanalysisreport.dll metalanalysisreport.xll" ]
