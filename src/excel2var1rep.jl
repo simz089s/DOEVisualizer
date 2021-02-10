@@ -2,21 +2,15 @@
 
 # using PackageCompiler
 
-using CSV
-using DataFrames
+using CSV, DataFrames
 
 # using ForwardDiff
 # using AutoGrad
-# using Polynomials
-using GLM
-using StatsModels
+using GLM, StatsModels
 
-using Plots
-using StatsPlots
-# using PyPlot
+using Plots, StatsPlots
 # using Gadfly
 # using Makie
-# using Plotly, PlotlyJS
 pyplot()
 
 df = CSV.File("res/heat_treatement_data_2.csv") |> DataFrame
@@ -28,17 +22,15 @@ rename!(df, titles)
 delete!(df, 1)
 df[!, :] = parse.(Float64, df[!, :])
 
-xs = df[:, 1:3]
-ys = df[:, 4:6]
+xs = select(df, titles[1:3])
+ys = select(df, titles[4:6])
 
 f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
-model = lm(f, select(df, 1:4))
-# f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
-# model = lm(f, select(df, 1:4))
+model = glm(f, select(df, 1:4), Normal(), IdentityLink())
 
-@df df plot(xs[1], xs[2], ys[1], line=:scatter, zcolor=ys[1], xaxis="S time", yaxis="Temp.", lab="Yield")
-@df df plot!(xs[1], xs[2], predict(model), line=:surface, label="y_yield ~ 1 + x_stime + x_t + x_atime")
-@df df plot!(xs[1], xs[2], predict(model), line=:line, label="y_yield ~ 1 + x_stime + x_t + x_atime")
+# @df df plot(xs[1], xs[2], ys[1], line=:scatter, zcolor=ys[1], xaxis="S time", yaxis="Temp.", lab="Yield")
+# @df df plot!(xs[1], xs[2], predict(model), line=:surface, label="y_yield ~ 1 + x_stime + x_t + x_atime")
+# @df df plot!(xs[1], xs[2], predict(model), line=:line, label="y_yield ~ 1 + x_stime + x_t + x_atime")
 
 # @df df plot(xs[1], xs[3], ys[1], line=:scatter, zcolor=ys[1], xaxis="S time", yaxis="Temp.", lab="Yield")
 # @df df plot!(xs[1], xs[3], predict(model), line=:surface, label="y_yield ~ 1 + x_stime + x_t + x_atime")
@@ -47,5 +39,9 @@ model = lm(f, select(df, 1:4))
 # @df df plot(xs[2], xs[3], ys[1], line=:scatter, zcolor=ys[1], xaxis="S time", yaxis="Temp.", lab="Yield")
 # @df df plot!(xs[2], xs[3], predict(model), line=:surface, label="y_yield ~ 1 + x_stime + x_t + x_atime")
 # @df df plot!(xs[2], xs[3], predict(model), line=:line, label="y_yield ~ 1 + x_stime + x_t + x_atime")
+
+for (idx, title) ∈ enumerate(names(xs))
+    display(@df df plot(xs[1], xs[2], xs[3], line=:scatter, zcolor=ys[idx], markersize=10, c=ColorGradient([:red,:yellow,:green]), xaxis="S time", yaxis="Temp.", zaxis="A time", lab=title))
+end
 
 # end
