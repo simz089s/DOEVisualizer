@@ -8,10 +8,8 @@ using CSV, DataFrames
 # using AutoGrad
 # using GLM, StatsModels
 
-using Plots, StatsPlots
-# using Gadfly
+using PyPlot#, StatsPlots
 # using Makie
-pyplot()
 
 df = CSV.File("res/heat_treatement_data_2.csv") |> DataFrame
 
@@ -34,19 +32,26 @@ df[!, :] = parse.(Float64, df[!, :])
 # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
 # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
 
-graphs = Array{Plots.Plot{Plots.PyPlotBackend}, 1}(undef, NUM_RESPS)
+# using3D()
+# fig = figure()
+# ax = fig.add_subplot(projection="3d")
+# cm = get_cmap(:tab20)
+# colours = [cm(v/10) for v in 1:NUM_VARS*NUM_RESPS]
+# colours = [c for c in 1:NUM_VARS*NUM_RESPS]
+colours = [.1 .85 .87 .89 .91 .93 .95 .97 .99]
+
+graphs = Array{Any, 1}(undef, NUM_RESPS)
 for (idx, title) ∈ enumerate(names(select(df, 4:6, copycols=false)))
-    df_sorted_by_y = select(df, titles[1:3], title)
-    df_sorted_by_y = sort!(df_sorted_by_y, title)
-    graphs[idx] = @df df plot(
-        df_sorted_by_y[1], df_sorted_by_y[2], df_sorted_by_y[3],
-        line=:scatter, zcolor=df_sorted_by_y[title], markersize=10, markershape=:circle, c=cgrad([:red3, :yellow, :green]),
-        lab="Low", xaxis=titles[1], yaxis=titles[2], zaxis=titles[3],
-        extra_kwargs=Dict(:series => Dict("depthshade" => false)),
-        reuse=false
+    graphs[idx] = scatter3D(
+        df[1], df[2], df[3],
+        marker="o", s=200, c=colours, edgecolors="black",
+        # zcolor=df[title], markersize=10, markershape=:circle, c=cgrad([:red3, :yellow, :green]),
+        # lab=title, xaxis=titles[1], yaxis=titles[2], zaxis=titles[3],
+        # reuse=false,
+        depthshade=false,
     )
 end
-display(plot(graphs...))
+# plot3D(graphs...)
 
 # graph = @df df plot(df_sorted_by_y[1], df_sorted_by_y[2], predict(model), line=:surface)
 
