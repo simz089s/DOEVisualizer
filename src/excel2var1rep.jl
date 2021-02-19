@@ -24,6 +24,8 @@ df[!, :] = parse.(Float64, df[!, :])
 # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
 # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
 
+calc_range(a) = abs(-(extrema(a)...))
+
 x = df[1]
 y = df[2]
 z = df[3]
@@ -33,32 +35,20 @@ scene, layout = layoutscene()
 s = layout[1, 1] = LScene(scene)
 scatter!(
     s,
-    x, .1 * y, z,
-    markersize = 300, marker = :circle,
-    colormap = :RdYlGn_3,# colorrange = 1:80,
-    # scale_plot = true,
+    x / calc_range(x), y / calc_range(y), z / calc_range(z),
+    markersize = 100, marker = :circle,
+    color = to_colormap(:RdYlGn_3, 9),
     show_axis = true,
+    # scale_plot = true,
     # transparency = true, alpha = 0.1,
-    # limits = FRect3D( (3, 140, 2), (4, 40, 3) ),
-    # scale = (1, 1, 1),
-    # axis = (
-        # names = (
-        #     axisnames = ("x", "y", "z"),
-        # ),
-        # scale = (1, .05, 1),
-        # scale_plot = true,
-        # ticks = (
-        #     ranges = Node((3:7, 140:180, 2:5)),
-        # ),
-        # grid = (
-        #     linewidth = (0, .5, 0),
-        # ),
-    # ),
+    # shading = false,
 )
-# scale!(scene, 1, 1/100, 1)
+xticks!(s.scene, xticklabels=string.(x))
 yticks!(s.scene, yticklabels=string.(y))
+zticks!(s.scene, zticklabels=string.(z))
+center!(scene)
 
 # fig
-display(scene)
+display(s.scene)
 
 # end
