@@ -46,16 +46,4 @@ s = fig, axes, obj = scatter(
 
 fig
 
-# graphs = Array{Any, 1}(undef, NUM_RESPS)
-# for (idx, title) ∈ enumerate(names(select(df, 4:6, copycols=false)))
-#     graphs[idx] = scatter3D(
-#         df[1], df[2], df[3],
-#         marker="o", s=200, c=colours, edgecolors="black",
-#         # zcolor=df[title], markersize=10, markershape=:circle, c=cgrad([:red3, :yellow, :green]),
-#         # lab=title, xaxis=titles[1], yaxis=titles[2], zaxis=titles[3],
-#         # reuse=false,
-#         depthshade=false,
-#     )
-# end
-
 # end
