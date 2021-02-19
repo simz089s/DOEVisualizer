@@ -5,8 +5,7 @@
 using CSV, DataFrames
 # using GLM, StatsModels
 
-using PyPlot#, StatsPlots
-# using Makie
+using GLMakie#, Makie
 
 df = CSV.File("res/heat_treatement_data_2.csv") |> DataFrame
 
@@ -25,31 +24,38 @@ df[!, :] = parse.(Float64, df[!, :])
 # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
 # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
 
-# using3D()
-# fig = figure()
-# ax = fig.add_subplot(projection="3d")
-# cm = get_cmap(:tab20)
-# colours = [cm(v/10) for v in 1:NUM_VARS*NUM_RESPS]
-# colours = [c for c in 1:NUM_VARS*NUM_RESPS]
-colours = [.1 .85 .87 .89 .91 .93 .95 .97 .99]
+s = fig, axes, obj = scatter(
+    df[1], df[2], df[3],
+    # colors = (colors, colors, colors),
+    markersize = 500,
+    # transparency = true, alpha = 0.1,
+    # limits = FRect3D( (3, 140, 2), (4, 40, 3) ),
+    # scale = (1, 2, 1),
+    # axis3d = (
+    #     # names = (
+    #     #     axisnames = ("x", "y", "z"),
+    #     # ),
+    #     # scale = (1, .05, 1),
+    #     # scale_plot = true,
+    #     ticks = (
+    #         ranges = Node((3:7, 140:180, 2:5)),
+    #     ),
+    # ),
+)
+# yticks!(s, ytickrange=80)
 
-graphs = Array{Any, 1}(undef, NUM_RESPS)
-for (idx, title) ∈ enumerate(names(select(df, 4:6, copycols=false)))
-    graphs[idx] = scatter3D(
-        df[1], df[2], df[3],
-        marker="o", s=200, c=colours, edgecolors="black",
-        # zcolor=df[title], markersize=10, markershape=:circle, c=cgrad([:red3, :yellow, :green]),
-        # lab=title, xaxis=titles[1], yaxis=titles[2], zaxis=titles[3],
-        # reuse=false,
-        depthshade=false,
-    )
-    # get!(graphs[idx].attr, :depthshade, false)
-    # get!(graphs[idx].series_list[1].plotattributes, :depthshade, false)
-end
-# plot3D(graphs...)
+fig
 
-# graph = @df df plot(df_sorted_by_y[1], df_sorted_by_y[2], predict(model), line=:surface)
-
-# close("all")
+# graphs = Array{Any, 1}(undef, NUM_RESPS)
+# for (idx, title) ∈ enumerate(names(select(df, 4:6, copycols=false)))
+#     graphs[idx] = scatter3D(
+#         df[1], df[2], df[3],
+#         marker="o", s=200, c=colours, edgecolors="black",
+#         # zcolor=df[title], markersize=10, markershape=:circle, c=cgrad([:red3, :yellow, :green]),
+#         # lab=title, xaxis=titles[1], yaxis=titles[2], zaxis=titles[3],
+#         # reuse=false,
+#         depthshade=false,
+#     )
+# end
 
 # end
