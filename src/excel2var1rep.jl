@@ -26,29 +26,45 @@ df[!, :] = parse.(Float64, df[!, :])
 
 calc_range(a) = abs(-(extrema(a)...))
 
-x = df[1]
-y = df[2]
-z = df[3]
+n = size(df)[1]
+x = select(df, 1, copycols=false)[1]
+y = select(df, 2, copycols=false)[1]
+z = select(df, 3, copycols=false)[1]
+rangex = calc_range(x)
+rangey = calc_range(y)
+rangez = calc_range(z)
+extx = extrema(x)
+exty = extrema(y)
+extz = extrema(z)
+scalx = x / rangex
+scaly = y / rangey
+scalz = z / rangez
+extscalx = extx ./ rangex
+extscaly = exty ./ rangey
+extscalz = extz ./ rangez
 
 scene, layout = layoutscene()
 
 s = layout[1, 1] = LScene(scene)
+sort!(df, :y_yield)
 scatter!(
     s,
-    x / calc_range(x), y / calc_range(y), z / calc_range(z),
+    scalx, scaly, scalz,
     markersize = 100, marker = :circle,
-    color = to_colormap(:RdYlGn_3, 9),
+    color = to_colormap(:RdYlGn_3, n),
     show_axis = true,
     # scale_plot = true,
     # transparency = true, alpha = 0.1,
     # shading = false,
+    # limits = FRect3D( (3, 140, 2), (4, 40, 3) ),
 )
-xticks!(s.scene, xticklabels=string.(x))
-yticks!(s.scene, yticklabels=string.(y))
-zticks!(s.scene, zticklabels=string.(z))
-center!(scene)
+xticks!(s.scene, xticklabels=string.(range(extx..., length=n)))
+yticks!(s.scene, yticklabels=string.(range(exty..., length=n)))
+zticks!(s.scene, zticklabels=string.(range(extz..., length=n)))
+xlims!(s.scene, extscalx)
+ylims!(s.scene, extscaly)
+zlims!(s.scene, extscalz)
 
-# fig
 display(s.scene)
 
 # end
