@@ -33,9 +33,6 @@ z = select(df, 3, copycols=false)[1]
 rangex = calc_range(x)
 rangey = calc_range(y)
 rangez = calc_range(z)
-scalx = x / rangex
-scaly = y / rangey
-scalz = z / rangez
 extx = extrema(x)
 exty = extrema(y)
 extz = extrema(z)
@@ -46,19 +43,21 @@ extscalz = extz ./ rangez
 scene, layout = layoutscene()
 
 s = layout[1, 1] = LScene(scene)
+colors = to_colormap(:RdYlGn_3, n)
 sort!(df, :y_yield)
-scatter!(
-    s,
-    scalx, scaly, scalz,
-    markersize = 100, marker = :circle,
-    color = to_colormap(:RdYlGn_3, n),
-    # colormap = to_colormap(:RdYlGn_3, n), colorrange = (1, 9),
-    show_axis = true,
-    # scale_plot = true,
-    # transparency = true, alpha = 0.1,
-    # shading = false,
-    # limits = FRect3D( (3, 140, 2), (4, 40, 3) ),
-)
+for (idx, col) in enumerate(colors)
+    scalx = x / rangex
+    scaly = y / rangey
+    scalz = z / rangez
+    scatter!(
+        s,
+        [scalx[idx]], [scaly[idx]], [scalz[idx]],
+        markersize = 100, marker = :circle,
+        color = col,
+        show_axis = true,
+        camera = cam3d!,
+    )
+end
 xticks!(s.scene, xtickrange=range(extscalx..., length=n), xticklabels=string.(range(extx..., length=n)))
 yticks!(s.scene, ytickrange=range(extscaly..., length=n), yticklabels=string.(range(exty..., length=n)))
 zticks!(s.scene, ztickrange=range(extscalz..., length=n), zticklabels=string.(range(extz..., length=n)))
