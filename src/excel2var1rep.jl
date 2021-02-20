@@ -11,8 +11,8 @@ function read_data()
     df = CSV.File("res/heat_treatement_data_2.csv") |> DataFrame
     
     types = df[1, :]
-    # NUM_VARS = count(t -> !ismissing(t) && t == "variable", types)
-    # NUM_RESPS = count(t -> !ismissing(t) && t == "response", types)
+    num_vars = count(t -> !ismissing(t) && t == "variable", types)
+    num_resps = count(t -> !ismissing(t) && t == "response", types)
     # NUM_LVLS = 
     
     select!(df, Not(1))
@@ -22,7 +22,7 @@ function read_data()
     delete!(df, 1)
     df[!, :] = parse.(Float64, df[!, :])
 
-    df, titles, types
+    df, titles, types, num_vars, num_resps
 end
 
 calc_range(a) = abs(-(extrema(a)...))
@@ -50,7 +50,7 @@ function get_ranges(df)
 end
 
 function graph()
-    df, titles, types = read_data()
+    df, titles, types, num_vars, num_resps = read_data()
 
     n,
     x, y, z,
@@ -69,7 +69,7 @@ function graph()
     
     colors = to_colormap(:RdYlGn_3, n)
 
-    titles_resp = view(titles, 4:5)
+    titles_resp = view(titles, num_vars+1:num_vars+num_resps) # TODO
 
     for (idx, title) in enumerate(titles_resp)
         s = layout[1, idx] = LScene(scene)
@@ -90,7 +90,7 @@ function graph()
                 camera = cam3d!,
             )
         end
-        
+
         xticks!(s.scene, xtickrange=xtickrange, xticklabels=xticklabels)
         yticks!(s.scene, ytickrange=ytickrange, yticklabels=yticklabels)
         zticks!(s.scene, ztickrange=ztickrange, zticklabels=zticklabels)
