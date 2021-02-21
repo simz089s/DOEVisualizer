@@ -3,9 +3,9 @@
 # using PackageCompiler
 
 using CSV, DataFrames
+using Colors, Statistics
+using GLMakie
 # using GLM, StatsModels
-
-using GLMakie#, Makie
 
 function read_data(filename)
     df = CSV.File(filename) |> DataFrame
@@ -92,7 +92,7 @@ function graph()
     scal_uniq_var_vals[3] /= range_z
 
     for (idx, title) in enumerate(titles_resp)
-        s = layout[div(idx, 2, RoundUp), idx%2] = LScene(scene) # Lay out plots in grid fashion (div or % determines columnwise or rowwise)
+        s = layout[div(idx, 2, RoundUp), mod1(idx, 2)] = LScene(scene) # Lay out plots in grid fashion (div or mod determines columnwise or rowwise)
 
         # Plot point one-by-one individually so we can map colormap to response value
         sort!(df, title)
@@ -100,16 +100,25 @@ function graph()
         scal_x = x / range_x
         scal_y = y / range_y
         scal_z = z / range_z
+        scal_plot_unit = mean((range_x, range_y, range_z))
 
         # Draw points
         for (i, col) in enumerate(colors)
             scatter!(
                 s,
                 scal_x[i:i], scal_y[i:i], scal_z[i:i],
-                markersize = 100, marker = :circle,
+                markersize = scal_plot_unit * 5, marker = :circle,
                 color = col,
                 show_axis = true,
                 camera = cam3d!,
+            )
+            text!(
+                s,
+                "$((x[i], y[i], z[i]))",
+                position = Point3f0(scal_x[i]+.5/range_x, scal_y[i]+.1/range_y, scal_z[i]+.2/range_z),
+                textsize = scal_plot_unit / 500,
+                color = :black,
+                rotation = 3.15,
             )
         end
         
@@ -134,6 +143,8 @@ function graph()
                         s,
                         data[1], data[2], data[3],
                         linestyle = :dash,
+                        transparency = true,
+                        color = RGBA(0., 0., 0., .4),
                         # color = colors,
                         show_axis = true,
                     )
@@ -156,7 +167,3 @@ graph()
 # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
 
 # end
-
-# grid
-# label
-# optimize (cache) scal_ / range_
