@@ -72,7 +72,7 @@ function graph()
     titles_resp = view(titles, num_vars+1:num_vars+num_resps) # TODO
 
     for (idx, title) in enumerate(titles_resp)
-        s = layout[1, idx] = LScene(scene)
+        s = layout[div(idx, 2, RoundUp), idx%2] = LScene(scene)
 
         sort!(df, title)
 
