@@ -120,19 +120,24 @@ function graph()
             invar_data_dim_idx1 = mod1(var_dim_idx + 1, 3)
             invar_data_dim_idx2 = mod1(var_dim_idx + 2, 3)
             for line_idx in 1:n_uniq_var_vals
-                invar_data_dim1 = fill(scal_uniq_var_vals[invar_data_dim_idx1][line_idx], n_uniq_var_vals)
-                invar_data_dim2 = fill(scal_uniq_var_vals[invar_data_dim_idx2][line_idx], n_uniq_var_vals)
-                data = Array{Array{Float64, 1}, 1}(undef, 3)
-                data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
-                data[invar_data_dim_idx1] = invar_data_dim1
-                data[invar_data_dim_idx2] = invar_data_dim2
-                lines!(
-                    s,
-                    data[1], data[2], data[3],
-                    linestyle = :dash,
-                    # color = colors,
-                    show_axis = true,
-                )
+                for line_idx2 in 1:n_uniq_var_vals
+                    invar_data_dim1 = fill(scal_uniq_var_vals[invar_data_dim_idx1][line_idx], n_uniq_var_vals)
+                    invar_data_dim2 = fill(scal_uniq_var_vals[invar_data_dim_idx2][line_idx2], n_uniq_var_vals)
+
+                    # Plot function takes in order x,y,z
+                    data = Array{Array{Float64, 1}, 1}(undef, 3)
+                    data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
+                    data[invar_data_dim_idx1] = invar_data_dim1
+                    data[invar_data_dim_idx2] = invar_data_dim2
+                    
+                    lines!(
+                        s,
+                        data[1], data[2], data[3],
+                        linestyle = :dash,
+                        # color = colors,
+                        show_axis = true,
+                    )
+                end
             end
         end
 
