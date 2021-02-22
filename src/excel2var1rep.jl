@@ -158,10 +158,27 @@ function graph()
         # display(s.scene)
     end
     
+    # display(scene)
+    scene
+end
+
+function save_button(scene, filename)
+    scene.center = false
+    save(filename, scene)
+end
+
+function main(args)
+    filename_save = args[1]
+
+    scene = graph()
+    # save_button(scene, filename_save)
+    
     display(scene)
 end
 
-graph()
+args = ("taguchi.png",)
+# args = readline()
+main(args)
 
 # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
 # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
