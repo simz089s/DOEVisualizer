@@ -67,7 +67,6 @@ function create_points_coords(s, x, y, z, range_x, range_y, range_z, scal_x, sca
             markersize = scal_plot_unit * 5, marker = :circle,
             color = col,
             show_axis = true,
-            camera = cam3d!,
         )
         text!(
             s,
@@ -146,7 +145,14 @@ function create_plots()
     scal_uniq_var_vals[3] /= range_z
 
     for (idx, title) in enumerate(titles_resp)
-        s = LScene(fig[div(idx, 2, RoundUp), mod1(idx, 2)], scenekw = ( camera = cam3d!, raw = false, )) # Lay out plots in grid fashion (div or mod determines columnwise or rowwise)
+        # Lay out plots in grid fashion (div or mod determines columnwise or rowwise)
+        s = LScene(
+            fig[ div(idx, 2, RoundUp), mod1(idx, 2) ],
+            scenekw = (
+                camera = cam3d!,
+                raw = false,
+            )
+        )
 
         # Plot point one-by-one individually so we can map colormap to response value
         sort!(df, title)
@@ -169,13 +175,13 @@ function create_plots()
     fig
 end
 
-function create_save_button(scene, filename)
-    button = Button(scene, label = "Save")
+function create_save_button(fig, filename)
+    button = Button(fig.scene, label = "Save")
 
     on(button.clicks) do n
         println("$(button.label[]) -> $filename.")
-        scene.center = false
-        save(filename, scene)
+        fig.scene.center = false
+        save(filename, fig.scene)
     end
 
     button
