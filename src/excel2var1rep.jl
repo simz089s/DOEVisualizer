@@ -71,7 +71,11 @@ function create_points_coords(s, x, y, z, range_x, range_y, range_z, scal_x, sca
         text!(
             s,
             "$((x[i], y[i], z[i]))",
-            position = Point3f0(scal_x[i]+.5/range_x, scal_y[i]+.1/range_y, scal_z[i]+.2/range_z),
+            position = Point3f0(
+                scal_x[i] + .5 / range_x,
+                scal_y[i] + .1 / range_y,
+                scal_z[i] + .2 / range_z
+            ),
             textsize = scal_plot_unit / 500,
             color = :black,
             rotation = 3.15,
@@ -103,7 +107,6 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
                     linestyle = :dash,
                     transparency = true,
                     color = RGBA(0., 0., 0., .4),
-                    # color = colors,
                     show_axis = true,
                 )
             end
@@ -111,9 +114,7 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
     end
 end
 
-function create_plots()
-    df, titles, types, num_vars, num_resps, num_rows = read_data("res/heat_treatement_data_2.csv") # TODO: better way to get filename/path
-
+function create_plots(df, titles, types, num_vars, num_resps, num_rows)
     x, y, z, n = get_xyzn(df)
 
     range_x, range_y, range_z,
@@ -147,7 +148,7 @@ function create_plots()
     for (idx, title) in enumerate(titles_resp)
         # Lay out plots in grid fashion (div or mod determines columnwise or rowwise)
         lscene = LScene(
-            fig[ div(idx, 2, RoundUp), mod1(idx, 2) ],
+            fig[ 1 + div(idx, 2, RoundUp), 1 + mod1(idx, 2) ],
             scenekw = (
                 camera = cam3d!,
                 raw = false,
@@ -171,13 +172,12 @@ function create_plots()
         zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
     end
 
-    # ls
     fig
 end
 
-function create_save_button(fig, filename)
+function create_save_button(fig, parent, filename)
     button = Button(
-        fig[2, 2],
+        parent,
         label = "Save",
         tellheight = false,
         tellwidth = false,
@@ -192,32 +192,68 @@ function create_save_button(fig, filename)
     button
 end
 
-function create_toggles(fig)
-    toggles = [ Toggle(fig, active = ac) for ac in [true, false] ]
-    labels = [ Label(
-        fig,
-        lift(x -> x ? "active" : "inactive", t.active)
-    ) for t in toggles ]
+function create_refresh_button(fig, parent, filename)
+    button = Button(
+        parent,
+        label = "Refresh",
+        tellheight = false,
+        tellwidth = false,
+    )
 
-    toggles, labels
+    on(button.clicks) do n
+        println("$(button.label[]) -> $filename.")
+    end
+
+    button
 end
 
-function main(args)
-    filename_save = args[1]
+function create_menus(fig, parent)
+    menu = Menu(parent, options = ["viridis", "heat", "blues"], tellheight = false, tellwidth = false)
 
-    main_fig = create_plots()
-    save_button = create_save_button(main_fig, filename_save)
-    toggles, toggle_labels = create_toggles(main_fig)
-    main_fig[2, 2] = grid!(hvcat(2, toggles, toggle_labels, save_button, save_button), tellheight = false, tellwidth = false)
+    # funcs = [sqrt, x->x^2, sin, cos]
+    # menu2 = Menu(parent, options = zip(["Square Root", "Square", "Sine", "Cosine"], funcs))
+
+    menu, menu2
+end
+
+# function create_toggles(fig)
+#     toggles = [ Toggle(fig, active = false), Toggle(fig, active = false), Toggle(fig, active = true), ]
+#     labels = [ Label( fig, lift(x -> x ? "active" : "inactive", t.active) ) for t in toggles ]
+
+#     toggles, labels
+# end
+
+function main(args)
+    filename_data = args[1]
+    filename_save = args[2]
+
+    df, titles, types, num_vars, num_resps, num_rows = read_data(filename_data) # TODO: better way to get filename/path
+
+    main_fig = create_plots(df, titles, types, num_vars, num_resps, num_rows)
+
+    save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
+    refresh_button = create_refresh_button(main_fig, main_fig[1, 2], filename_save)
+    menus = create_menus(main_fig, main_fig[2, 1])
+    # toggles, toggles_labels = create_toggles(main_fig)
+
+    # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
 
     display(main_fig)
 end
 
-args = ("taguchi.png",)
+args = (
+    "res/heat_treatement_data_2.csv",
+    "taguchi.png",
+)
 # args = readline()
 main(args)
 
 # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
 # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
+
+# menu en-haut
+# multi-select plot
+# refresh data
+# streamlined use
 
 # end
