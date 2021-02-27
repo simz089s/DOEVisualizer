@@ -114,7 +114,7 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
     end
 end
 
-function create_plots(df, titles, types, num_vars, num_resps, num_rows)
+function create_plots(df, titles, title, num_vars, num_resps, num_rows, pos_fig)
     x, y, z, n = get_xyzn(df)
 
     range_x, range_y, range_z,
@@ -145,32 +145,29 @@ function create_plots(df, titles, types, num_vars, num_resps, num_rows)
     scal_uniq_var_vals[2] /= range_y
     scal_uniq_var_vals[3] /= range_z
 
-    for (idx, title) in enumerate(titles_resp)
-        # Lay out plots in grid fashion (div or mod determines columnwise or rowwise)
-        lscene = LScene(
-            fig[ 1 + div(idx, 2, RoundUp), 1 + mod1(idx, 2) ],
-            scenekw = (
-                camera = cam3d!,
-                raw = false,
-            ),
-        )
+    lscene = LScene(
+        fig[pos_fig...],
+        scenekw = (
+            camera = cam3d!,
+            raw = false,
+        ),
+    )
 
-        # Plot point one-by-one individually so we can map colormap to response value
-        sort!(df, title)
+    # Plot point one-by-one individually so we can map colormap to response value
+    sort!(df, title)
 
-        scal_x = x / range_x
-        scal_y = y / range_y
-        scal_z = z / range_z
-        scal_plot_unit = mean((range_x, range_y, range_z))
+    scal_x = x / range_x
+    scal_y = y / range_y
+    scal_z = z / range_z
+    scal_plot_unit = mean((range_x, range_y, range_z))
 
-        create_points_coords(lscene, x, y, z, range_x, range_y, range_z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    create_points_coords(lscene, x, y, z, range_x, range_y, range_z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
-        create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
+    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
 
-        xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
-        yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
-        zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
-    end
+    xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
+    yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
+    zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
 
     fig
 end
@@ -179,8 +176,6 @@ function create_save_button(fig, parent, filename)
     button = Button(
         parent,
         label = "Save",
-        tellheight = false,
-        tellwidth = false,
     )
 
     on(button.clicks) do n
@@ -196,8 +191,6 @@ function create_refresh_button(fig, parent, filename)
     button = Button(
         parent,
         label = "Refresh",
-        tellheight = false,
-        tellwidth = false,
     )
 
     on(button.clicks) do n
@@ -208,7 +201,7 @@ function create_refresh_button(fig, parent, filename)
 end
 
 function create_menus(fig, parent)
-    menu = Menu(parent, options = ["viridis", "heat", "blues"], tellheight = false, tellwidth = false)
+    menu = Menu(parent, options = ["viridis", "heat", "blues"])
 
     # funcs = [sqrt, x->x^2, sin, cos]
     # menu2 = Menu(parent, options = zip(["Square Root", "Square", "Sine", "Cosine"], funcs))
@@ -229,14 +222,15 @@ function main(args)
 
     df, titles, types, num_vars, num_resps, num_rows = read_data(filename_data) # TODO: better way to get filename/path
 
-    main_fig = create_plots(df, titles, types, num_vars, num_resps, num_rows)
+    main_fig = create_plots(df, titles, titles[1], num_vars, num_resps, num_rows, (2, 1:3))
 
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
     refresh_button = create_refresh_button(main_fig, main_fig[1, 2], filename_save)
-    menus = create_menus(main_fig, main_fig[2, 1])
+    menus = create_menus(main_fig, main_fig[1, 3])
     # toggles, toggles_labels = create_toggles(main_fig)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
+    trim!(main_fig.layout)
 
     display(main_fig)
 end
