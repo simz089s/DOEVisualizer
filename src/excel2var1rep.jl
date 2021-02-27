@@ -146,12 +146,12 @@ function create_plots()
 
     for (idx, title) in enumerate(titles_resp)
         # Lay out plots in grid fashion (div or mod determines columnwise or rowwise)
-        s = LScene(
+        lscene = LScene(
             fig[ div(idx, 2, RoundUp), mod1(idx, 2) ],
             scenekw = (
                 camera = cam3d!,
                 raw = false,
-            )
+            ),
         )
 
         # Plot point one-by-one individually so we can map colormap to response value
@@ -162,13 +162,13 @@ function create_plots()
         scal_z = z / range_z
         scal_plot_unit = mean((range_x, range_y, range_z))
 
-        create_points_coords(s, x, y, z, range_x, range_y, range_z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+        create_points_coords(lscene, x, y, z, range_x, range_y, range_z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
-        create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
+        create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
 
-        xticks!(s.scene, xtickrange = xtickrange, xticklabels = xticklabels)
-        yticks!(s.scene, ytickrange = ytickrange, yticklabels = yticklabels)
-        zticks!(s.scene, ztickrange = ztickrange, zticklabels = zticklabels)
+        xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
+        yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
+        zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
     end
 
     # ls
@@ -176,7 +176,12 @@ function create_plots()
 end
 
 function create_save_button(fig, filename)
-    button = Button(fig.scene, label = "Save")
+    button = Button(
+        fig[2, 2],
+        label = "Save",
+        tellheight = false,
+        tellwidth = false,
+    )
 
     on(button.clicks) do n
         println("$(button.label[]) -> $filename.")
@@ -187,13 +192,25 @@ function create_save_button(fig, filename)
     button
 end
 
+function create_toggles(fig)
+    toggles = [ Toggle(fig, active = ac) for ac in [true, false] ]
+    labels = [ Label(
+        fig,
+        lift(x -> x ? "active" : "inactive", t.active)
+    ) for t in toggles ]
+
+    toggles, labels
+end
+
 function main(args)
     filename_save = args[1]
 
-    fig = create_plots()
-    save_button = create_save_button(fig, filename_save)
+    main_fig = create_plots()
+    save_button = create_save_button(main_fig, filename_save)
+    toggles, toggle_labels = create_toggles(main_fig)
+    main_fig[2, 2] = grid!(hvcat(2, toggles, toggle_labels, save_button, save_button), tellheight = false, tellwidth = false)
 
-    display(fig)
+    display(main_fig)
 end
 
 args = ("taguchi.png",)
