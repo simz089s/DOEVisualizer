@@ -11,20 +11,25 @@ function read_data(filename)
     df = CSV.File(filename) |> DataFrame
 
     # First row after title should be indicating if the column is a variable or response
-    types = df[1, :]
-    num_vars = count(t -> !ismissing(t) && t == "variable", types)
-    num_resps = count(t -> !ismissing(t) && t == "response", types)
+    types = map(t -> ismissing(t) ? "" : t, df[1, :])
+    num_vars = count(t -> t == "variable", types)
+    num_resps = count(t -> t == "response", types)
     # NUM_LVLS = 
-    num_rows = nrow(df) - 1 # Exclude row indicating if it is a variable or response column
+    # num_rows = nrow(df) - 1 # Exclude row indicating if it is a variable or response column
+    idx_miss = [i for (i, t) in enumerate(types) if t == ""] # Missing type column indices
+    select!(df, Not(idx_miss)) # TODO: clarify if (redundant) index row will always be there
+    types = df[1, :]
+    idx_vars = [i for (i, t) in enumerate(types) if t == "variable"] # Variables column indices
+    idx_resps = [i for (i, t) in enumerate(types) if t == "response"] # Responses column indices
 
-    select!(df, Not(1)) # TODO: clarify if (redundant) index row will always be there
-    # titles = replace.(["$(x) ($(y))" for (x, y) in zip(names(df), df[1, :])], " "=>"_")
-    titles = [:x_stime, :x_t, :x_atime, :y_yield, :y_str, :y_elong] # TODO: find better way to title
+    titles = replace.(names(df), " " => "_")
     rename!(df, titles)
     delete!(df, 1) # Remove the row indicating if it is a variable or response column
     df[!, :] = parse.(Float64, df[!, :]) # Float64 for max compatibility with libraries...
+    vars = select(df, idx_vars)
+    resps = select(df, idx_resps)
 
-    df, titles, types, num_vars, num_resps, num_rows
+    df, titles, vars, resps, num_vars, num_resps#, num_rows
 end
 
 function get_xyzn(df)
@@ -114,7 +119,7 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
     end
 end
 
-function create_plots(df, titles, title, num_vars, num_resps, num_rows, pos_fig)
+function create_plots(df, titles, title, num_vars, num_resps, pos_fig)
     x, y, z, n = get_xyzn(df)
 
     range_x, range_y, range_z,
@@ -200,13 +205,10 @@ function create_refresh_button(fig, parent, filename)
     button
 end
 
-function create_menus(fig, parent)
-    menu = Menu(parent, options = ["viridis", "heat", "blues"])
+function create_menus(fig, parent, titles)
+    menu = Menu(parent, options = zip(titles, titles))
 
-    # funcs = [sqrt, x->x^2, sin, cos]
-    # menu2 = Menu(parent, options = zip(["Square Root", "Square", "Sine", "Cosine"], funcs))
-
-    menu, menu2
+    menu
 end
 
 # function create_toggles(fig)
@@ -220,13 +222,13 @@ function main(args)
     filename_data = args[1]
     filename_save = args[2]
 
-    df, titles, types, num_vars, num_resps, num_rows = read_data(filename_data) # TODO: better way to get filename/path
+    df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
 
-    main_fig = create_plots(df, titles, titles[1], num_vars, num_resps, num_rows, (2, 1:3))
+    main_fig = create_plots(df, titles, titles[1], num_vars, num_resps, (2, 1:3)) # Generate first response plot by default
 
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
-    refresh_button = create_refresh_button(main_fig, main_fig[1, 2], filename_save)
-    menus = create_menus(main_fig, main_fig[1, 3])
+    refresh_button = create_refresh_button(main_fig, main_fig[1, 2], filename_data)
+    menus = create_menus(main_fig, main_fig[1, 3], names(resps))
     # toggles, toggles_labels = create_toggles(main_fig)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
