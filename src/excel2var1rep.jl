@@ -205,8 +205,13 @@ function create_refresh_button(fig, parent, filename)
     button
 end
 
-function create_menus(fig, parent, titles)
-    menu = Menu(parent, options = zip(titles, titles))
+function create_menus(fig, parent, df, titles, titles_resps, num_vars, num_resps)
+    fig_gens = [() -> create_plots(df, titles, title, num_vars, num_resps, (2, 1:3)) for title in titles_resps]
+    menu = Menu(parent, options = zip(titles_resps, fig_gens))
+
+    on(menu.selection) do s
+        s()
+    end
 
     menu
 end
@@ -218,23 +223,30 @@ end
 #     toggles, labels
 # end
 
-function main(args)
-    filename_data = args[1]
-    filename_save = args[2]
-
-    df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
-
+function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
     main_fig = create_plots(df, titles, titles[1], num_vars, num_resps, (2, 1:3)) # Generate first response plot by default
 
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
     refresh_button = create_refresh_button(main_fig, main_fig[1, 2], filename_data)
-    menus = create_menus(main_fig, main_fig[1, 3], names(resps))
+    menu = create_menus(main_fig, main_fig[1, 3], df, titles, names(resps), num_vars, num_resps)
+    # on(menu.selection) do s
+    #     s()
+    # end
     # toggles, toggles_labels = create_toggles(main_fig)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
     trim!(main_fig.layout)
 
     display(main_fig)
+end
+
+function main(args)
+    filename_data = args[1]
+    filename_save = args[2]
+
+    df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
+
+    setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
 end
 
 args = (
