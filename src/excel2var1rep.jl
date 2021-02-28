@@ -7,6 +7,7 @@ using Colors, Statistics
 using GLMakie, AbstractPlotting
 # using GLM, StatsModels
 
+
 function read_data(filename)
     df = CSV.File(filename) |> DataFrame
 
@@ -32,6 +33,7 @@ function read_data(filename)
     df, titles, vars, resps, num_vars, num_resps#, num_rows
 end
 
+
 function get_xyzn(df)
     n = size(df)[1] # Number of rows (data points)
     # TODO: better way to select variables
@@ -42,7 +44,9 @@ function get_xyzn(df)
     x, y, z, n
 end
 
+
 calc_range(a) = abs(-(extrema(a)...)) # Find interval size max-min of a set of values
+
 
 function get_ranges(x, y, z)
     range_x = calc_range(x)
@@ -62,6 +66,7 @@ function get_ranges(x, y, z)
         ext_x, ext_y, ext_z,
         scal_ext_x, scal_ext_y, scal_ext_z
 end
+
 
 # Draw points and coordinates
 function create_points_coords(s, x, y, z, range_x, range_y, range_z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
@@ -87,6 +92,7 @@ function create_points_coords(s, x, y, z, range_x, range_y, range_z, scal_x, sca
         )
     end
 end
+
 
 # Draw grid
 # TODO: probably use some permutation function to make it more elegant
@@ -119,7 +125,8 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
     end
 end
 
-function create_plots(df, titles, title, num_vars, num_resps, pos_fig)
+
+function create_plots(df, titles, title, num_vars, num_resps, pos_fig; fig = Figure())
     x, y, z, n = get_xyzn(df)
 
     range_x, range_y, range_z,
@@ -134,8 +141,6 @@ function create_plots(df, titles, title, num_vars, num_resps, pos_fig)
     xticklabels = string.(range(ext_x..., length = n))
     yticklabels = string.(range(ext_y..., length = n))
     zticklabels = string.(range(ext_z..., length = n))
-
-    fig = Figure()
 
     colors = to_colormap(:RdYlGn_3, n) # Get N colors from colormap to represent response variable TODO: allow choosing colormap?
 
@@ -174,10 +179,11 @@ function create_plots(df, titles, title, num_vars, num_resps, pos_fig)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
     zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
 
-    fig
+    fig, lscene
 end
 
-function create_save_button(fig, parent, filename)
+
+function create_save_button(fig, parent, lscene, filename)
     button = Button(
         parent,
         label = "Save",
@@ -185,12 +191,14 @@ function create_save_button(fig, parent, filename)
 
     on(button.clicks) do n
         println("$(button.label[]) -> $filename.")
-        fig.scene.center = false
-        save(filename, fig.scene)
+        # fig.scene.center = false
+        lscene.scene.center = false
+        save(filename, lscene.scene)
     end
 
     button
 end
+
 
 function create_refresh_button(fig, parent, filename)
     button = Button(
@@ -200,33 +208,39 @@ function create_refresh_button(fig, parent, filename)
 
     on(button.clicks) do n
         println("$(button.label[]) -> $filename.")
+        # refresh_plot()
     end
 
     button
 end
 
+
 function create_menus(fig, parent, df, titles, titles_resps, num_vars, num_resps)
-    fig_gens = [() -> create_plots(df, titles, title, num_vars, num_resps, (2, 1:3)) for title in titles_resps]
-    menu = Menu(parent, options = zip(titles_resps, fig_gens))
+    # fig_gens = [() -> create_plots(df, titles, title, num_vars, num_resps, (2, 1:3)) for title in titles_resps]
+    # menu = Menu(parent, options = zip(titles_resps, fig_gens))
+    menu = Menu(parent, options = zip(titles_resps, titles_resps))
 
     on(menu.selection) do s
-        s()
+        println("Select -> $s.")
+        # s()
+        # parent.fig.scene.visible = false
+        refresh_plot(fig, df, titles, s, num_vars, num_resps, (2, 1:3))
     end
 
     menu
 end
 
-# function create_toggles(fig)
-#     toggles = [ Toggle(fig, active = false), Toggle(fig, active = false), Toggle(fig, active = true), ]
-#     labels = [ Label( fig, lift(x -> x ? "active" : "inactive", t.active) ) for t in toggles ]
 
-#     toggles, labels
-# end
+function refresh_plot(fig, df, titles, title, num_vars, num_resps, pos_fig)
+    create_plots(df, titles, title, num_vars, num_resps, pos_fig, fig = fig)
+    display(fig)
+end
+
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
-    main_fig = create_plots(df, titles, titles[1], num_vars, num_resps, (2, 1:3)) # Generate first response plot by default
+    main_fig, main_ls = create_plots(df, titles, titles[1], num_vars, num_resps, (2, 1:3)) # Generate first response plot by default
 
-    save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
+    save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
     refresh_button = create_refresh_button(main_fig, main_fig[1, 2], filename_data)
     menu = create_menus(main_fig, main_fig[1, 3], df, titles, names(resps), num_vars, num_resps)
     # on(menu.selection) do s
@@ -240,6 +254,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     display(main_fig)
 end
 
+
 function main(args)
     filename_data = args[1]
     filename_save = args[2]
@@ -248,6 +263,7 @@ function main(args)
 
     setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
 end
+
 
 args = (
     "res/heat_treatement_data_2.csv",
