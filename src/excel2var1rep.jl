@@ -3,8 +3,8 @@
 # using PackageCompiler
 
 using CSV, DataFrames
-using Colors, Statistics
-using GLMakie, AbstractPlotting
+using Statistics
+using GLMakie#, AbstractPlotting
 # using GLM, StatsModels
 
 
@@ -117,7 +117,7 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
                     data[1], data[2], data[3],
                     linestyle = :dash,
                     transparency = true,
-                    color = RGBA(0., 0., 0., .4),
+                    color = RGBAf0(0., 0., 0., .4),
                     show_axis = true,
                 )
             end
@@ -157,6 +157,7 @@ function create_plots(df, titles, title, num_vars, num_resps, pos_fig; fig = Fig
 
     lscene = LScene(
         fig[pos_fig...],
+        title = title,
         scenekw = (
             camera = cam3d!,
             raw = false,
@@ -191,7 +192,6 @@ function create_save_button(fig, parent, lscene, filename)
 
     on(button.clicks) do n
         println("$(button.label[]) -> $filename.")
-        # fig.scene.center = false
         lscene.scene.center = false
         save(filename, lscene.scene)
     end
@@ -200,31 +200,29 @@ function create_save_button(fig, parent, lscene, filename)
 end
 
 
-function create_refresh_button(fig, parent, filename)
+function create_refresh_button(fig, parent, lscene, filename, pos_fig)
     button = Button(
         parent,
         label = "Refresh",
     )
 
     on(button.clicks) do n
+        df, titles, _, _, num_vars, num_resps = read_data(filename)
         println("$(button.label[]) -> $filename.")
-        # refresh_plot()
+        refresh_plot(fig, df, titles, lscene.title.val, num_vars, num_resps, pos_fig)
     end
 
     button
 end
 
 
-function create_menus(fig, parent, df, titles, titles_resps, num_vars, num_resps)
-    # fig_gens = [() -> create_plots(df, titles, title, num_vars, num_resps, (2, 1:3)) for title in titles_resps]
-    # menu = Menu(parent, options = zip(titles_resps, fig_gens))
+function create_menus(fig, parent, df, titles, titles_resps, num_vars, num_resps, pos_fig)
     menu = Menu(parent, options = zip(titles_resps, titles_resps))
 
     on(menu.selection) do s
         println("Select -> $s.")
-        # s()
         # parent.fig.scene.visible = false
-        refresh_plot(fig, df, titles, s, num_vars, num_resps, (2, 1:3))
+        refresh_plot(fig, df, titles, s, num_vars, num_resps, pos_fig)
     end
 
     menu
@@ -238,15 +236,13 @@ end
 
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
-    main_fig, main_ls = create_plots(df, titles, titles[1], num_vars, num_resps, (2, 1:3)) # Generate first response plot by default
+    pos_fig = (2, 1:3)
+
+    main_fig, main_ls = create_plots(df, titles, titles[1], num_vars, num_resps, pos_fig) # Generate first response plot by default
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
-    refresh_button = create_refresh_button(main_fig, main_fig[1, 2], filename_data)
-    menu = create_menus(main_fig, main_fig[1, 3], df, titles, names(resps), num_vars, num_resps)
-    # on(menu.selection) do s
-    #     s()
-    # end
-    # toggles, toggles_labels = create_toggles(main_fig)
+    refresh_button = create_refresh_button(main_fig, main_fig[1, 2], main_ls, filename_data, pos_fig)
+    menu = create_menus(main_fig, main_fig[1, 3], df, titles, names(resps), num_vars, num_resps, pos_fig)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
     trim!(main_fig.layout)
@@ -274,10 +270,5 @@ main(args)
 
 # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
 # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
-
-# menu en-haut
-# multi-select plot
-# refresh data
-# streamlined use
 
 # end
