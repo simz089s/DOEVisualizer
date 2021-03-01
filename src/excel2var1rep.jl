@@ -1,5 +1,7 @@
 # module excel2var1rep
 
+@info "Pre-compiling..."
+
 # using PackageCompiler
 
 using CSV, DataFrames
@@ -7,6 +9,7 @@ using Statistics
 using GLMakie#, AbstractPlotting#, Makie
 # using GLM, StatsModels
 
+@info "Loading functions..."
 
 function read_data(filename)
     df = CSV.File(filename) |> DataFrame
@@ -68,27 +71,30 @@ function get_ranges(x, y, z)
 end
 
 
+# TODO: Find way to make relative size
 # Draw points and coordinates
-function create_points_coords(s, x, y, z, range_x, range_y, range_z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+function create_points_coords(s, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     for (i, col) in enumerate(colors)
         scatter!(
             s,
             scal_x[i:i], scal_y[i:i], scal_z[i:i],
-            markersize = scal_plot_unit * 5, marker = :circle,
+            markersize = scal_plot_unit * 40., marker = :circle,
             color = col,
             # show_axis = true,
         )
         text!(
             s,
-            "$((x[i], y[i], z[i]))",
+            # "$((x[i], y[i], z[i]))",
+            "$(resp[i, 1])",
             position = Point3f0(
-                scal_x[i] + .5 / range_x,
-                scal_y[i] + .1 / range_y,
-                scal_z[i] + .2 / range_z
+                scal_x[i] + .1 / scal_plot_unit,
+                scal_y[i] + .1 / scal_plot_unit,
+                scal_z[i] + .2 / scal_plot_unit
             ),
-            textsize = scal_plot_unit / 500,
+            textsize = scal_plot_unit / 50.,
             color = :black,
             rotation = 3.15,
+            overdraw = true,
         )
     end
 end
@@ -116,9 +122,10 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
                     s,
                     data[1], data[2], data[3],
                     # linestyle = :dash,
+                    linewidth = 2.,
                     # transparency = true,
                     # color = RGBAf0(0., 0., 0., .4),
-                    color = RGBAf0(0., 0., 0., 1),
+                    color = RGBAf0(0., 0., 0., 1.),
                 )
             end
         end
@@ -131,7 +138,7 @@ function create_arrows(s, vals)
         s,
         fill(Point3f0(vals[1][1], vals[2][1], vals[3][1]), 3),
         [ Point3f0(1, 0, 0), Point3f0(0, 1, 0), Point3f0(0, 0, 1), ],
-        arrowcolor = :black,
+        arrowcolor = :gray,
         arrowsize = .1,
         linecolor = :black,
     )
@@ -182,9 +189,9 @@ function create_plots(df, titles, title, num_vars, num_resps, pos_fig; fig = Fig
     scal_x = x / range_x
     scal_y = y / range_y
     scal_z = z / range_z
-    scal_plot_unit = mean((range_x, range_y, range_z))
+    scal_plot_unit = mean(mean.((scal_x, scal_y, scal_z)))
 
-    create_points_coords(lscene, x, y, z, range_x, range_y, range_z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    create_points_coords(lscene, select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
     create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
 
@@ -292,6 +299,7 @@ function main(args)
 
     df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
 
+    @info "Setting up interface and plots..."
     setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
 end
 
