@@ -154,7 +154,7 @@ function create_arrows(lscene, vals)
 end
 
 
-create_titles(lscene, axis, titles) = axis[:names, :axisnames] = (titles[1], titles[2], titles[3])
+create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
 
 
 function create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure())
