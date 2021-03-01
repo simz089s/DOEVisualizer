@@ -11,6 +11,12 @@ using GLMakie#, AbstractPlotting#, Makie
 
 @info "Loading functions..."
 
+function peek(thing)
+    println(fieldnames(typeof(thing)))
+    println(thing)
+end
+
+
 function read_data(filename)
     df = CSV.File(filename) |> DataFrame
 
@@ -73,17 +79,17 @@ end
 
 # TODO: Find way to make relative size
 # Draw points and coordinates
-function create_points_coords(s, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+function create_points_coords(lscene, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     for (i, col) in enumerate(colors)
         scatter!(
-            s,
+            lscene,
             scal_x[i:i], scal_y[i:i], scal_z[i:i],
             markersize = scal_plot_unit * 40., marker = :circle,
             color = col,
-            # show_axis = true,
+            show_axis = true,
         )
         text!(
-            s,
+            lscene,
             # "$((x[i], y[i], z[i]))",
             "$(resp[i, 1])",
             position = Point3f0(
@@ -97,12 +103,13 @@ function create_points_coords(s, resp, x, y, z, scal_x, scal_y, scal_z, scal_plo
             overdraw = true,
         )
     end
+    lscene.scene[OldAxis]
 end
 
 
 # Draw grid
 # TODO: probably use some permutation function to make it more elegant
-function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
+function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
     for var_dim_idx in 1:num_vars # scal_uniq_var_vals index of the dimension that will draw the line
         # scal_uniq_var_vals index of the other invariant dimensions
         invar_data_dim_idx1 = mod1(var_dim_idx + 1, 3)
@@ -119,13 +126,14 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
                 data[invar_data_dim_idx2] = invar_data_dim2
 
                 lines!(
-                    s,
+                    lscene,
                     data[1], data[2], data[3],
                     # linestyle = :dash,
                     linewidth = 2.,
                     # transparency = true,
                     # color = RGBAf0(0., 0., 0., .4),
-                    color = RGBAf0(0., 0., 0., 1.),
+                    color = :gray,
+                    # show_axis = true,
                 )
             end
         end
@@ -133,19 +141,23 @@ function create_grid(s, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
 end
 
 
-function create_arrows(s, vals)
+function create_arrows(lscene, vals)
     arrows!(
-        s,
+        lscene,
         fill(Point3f0(vals[1][1], vals[2][1], vals[3][1]), 3),
         [ Point3f0(1, 0, 0), Point3f0(0, 1, 0), Point3f0(0, 0, 1), ],
         arrowcolor = :gray,
         arrowsize = .1,
         linecolor = :black,
+        linewidth = 5.,
     )
 end
 
 
-function create_plots(df, titles, title, num_vars, num_resps, pos_fig; fig = Figure())
+create_titles(lscene, axis, titles) = axis[:names, :axisnames] = (titles[1], titles[2], titles[3])
+
+
+function create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure())
     x, y, z, n = get_xyzn(df)
 
     range_x, range_y, range_z,
@@ -191,7 +203,7 @@ function create_plots(df, titles, title, num_vars, num_resps, pos_fig; fig = Fig
     scal_z = z / range_z
     scal_plot_unit = mean(mean.((scal_x, scal_y, scal_z)))
 
-    create_points_coords(lscene, select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    axis = create_points_coords(lscene, select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
     create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
 
@@ -200,6 +212,8 @@ function create_plots(df, titles, title, num_vars, num_resps, pos_fig; fig = Fig
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
     zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
+
+    create_titles(lscene, axis, titles_var)
 
     fig, lscene
 end
@@ -221,7 +235,7 @@ function create_save_button(fig, parent, lscene, filename)
 end
 
 
-function create_refresh_button(fig, parent, cbar, lscene, filename, pos_fig, cm)
+function create_refresh_button(fig, parent, cbar, lscene, titles_vars, filename, pos_fig, cm)
     button = Button(
         parent,
         label = "Refresh",
@@ -230,28 +244,44 @@ function create_refresh_button(fig, parent, cbar, lscene, filename, pos_fig, cm)
     on(button.clicks) do n
         df, titles, _, _, num_vars, num_resps = read_data(filename)
         println("$(button.label[]) -> $filename.")
-        refresh_plot(fig, cbar, df, titles, lscene.title.val, num_vars, num_resps, pos_fig, cm)
+        refresh_plot(fig, cbar, df, titles, lscene.title.val, titles_vars, num_vars, num_resps, pos_fig, cm)
     end
 
     button
 end
 
 
-function create_menus(fig, parent, cbar, df, titles, titles_resps, num_vars, num_resps, pos_fig, cm)
-    menu = Menu(parent, options = zip(titles_resps, titles_resps))
+function create_menus(fig, parent, cbar, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
+    # menu_vars = Menu(
+    #     parent,
+    #     options = titles[1:3],
+    #     prompt = "Select variables...",
+    #     halign = :left,
+    #     width = 5,
+    # )
+        
+    menu_resp = Menu(
+        parent,
+        options = titles_resps,
+        prompt = "Select response...",
+        # halign = :right,
+    )
 
-    on(menu.selection) do s
+    on(menu_resp.selection) do s
         println("Select -> $s.")
         # parent.fig.scene.visible = false
-        refresh_plot(fig, cbar, df, titles, s, num_vars, num_resps, pos_fig, cm)
+        refresh_plot(fig, cbar, df, titles, s, titles_vars, num_vars, num_resps, pos_fig, cm)
     end
 
-    menu
+    # parent = grid!(hvcat(2, menu_vars, menu_resp))#, tellheight = false, tellwidth = false)
+
+    menu_resp
+    # menu_vars, menu_resp
 end
 
 
-function refresh_plot(fig, cbar, df, titles, title, num_vars, num_resps, pos_fig, cm)
-    create_plots(df, titles, title, num_vars, num_resps, pos_fig, fig = fig)
+function refresh_plot(fig, cbar, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, cm)
+    create_plots(df, titles, title, titles_vars, num_vars, num_resps, pos_fig, fig = fig)
     parent = fig[ pos_fig[1] + 1, pos_fig[2] ]
     # delete!(cbar.parent.scene, cbar.parent.scene.plots[1]) # TODO: Delete previous colorbar
     Colorbar(
@@ -268,11 +298,13 @@ end
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
     pos_fig = (2, 1:3)
+    titles_vars = names(vars)
+    titles_resps = names(resps)
     default_resp = select(resps, 1)
     default_resp_title = names(default_resp)[1]
     cm = :RdYlGn_3
 
-    main_fig, main_ls = create_plots(df, titles, default_resp_title, num_vars, num_resps, pos_fig) # TODO: Generate which response plot by default?
+    main_fig, main_ls = create_plots(df, titles, default_resp_title, titles_vars, num_vars, num_resps, pos_fig) # TODO: Generate which response plot by default?
     cbar = Colorbar(
         main_fig[ pos_fig[1] + 1, pos_fig[2] ],
         colormap = cm,
@@ -283,8 +315,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     )
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
-    refresh_button = create_refresh_button(main_fig, main_fig[1, 2], cbar, main_ls, filename_data, pos_fig, cm)
-    menu = create_menus(main_fig, main_fig[1, 3], cbar, df, titles, names(resps), num_vars, num_resps, pos_fig, cm)
+    refresh_button = create_refresh_button(main_fig, main_fig[1, 2], cbar, main_ls, titles_vars, filename_data, pos_fig, cm)
+    menus = create_menus(main_fig, main_fig[1, 3], cbar, df, titles, titles_resps, titles_vars, num_vars, num_resps, pos_fig, cm)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
     trim!(main_fig.layout)
