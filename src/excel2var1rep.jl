@@ -158,7 +158,7 @@ end
 create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
 
 
-function create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure())
+function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure())
     x, y, z, n = get_xyzn(df)
     lvls = trunc(Int, sqrt(n))
 
@@ -188,15 +188,6 @@ function create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fi
     scal_uniq_var_vals[2] /= range_y
     scal_uniq_var_vals[3] /= range_z
 
-    lscene = LScene(
-        fig[pos_fig...],
-        title = title,
-        scenekw = (
-            camera = cam3d!,
-            raw = false,
-        ),
-    )
-
     # Plot point one-by-one individually so we can map colormap to response value
     sort!(df, title)
 
@@ -225,6 +216,16 @@ function create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fi
 
     fig, lscene
 end
+
+create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure()) = create_plots(
+    LScene(
+        fig[pos_fig...],
+        title = title,
+        scenekw = (
+            camera = cam3d!,
+            raw = false,
+        ),
+    ), df, titles, title, titles_var, num_vars, num_resps, pos_fig, fig = fig)
 
 
 function create_save_button(fig, parent, lscene, filename)
@@ -300,7 +301,8 @@ function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_
     delete!(cbar)
     GC.gc(true)
 
-    new_fig, new_lscene = create_plots(df, titles, title, titles_vars, num_vars, num_resps, pos_fig, fig = fig)
+    lscene.title.val = title
+    new_fig, new_lscene = create_plots(lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, fig = fig)
     cbar = Colorbar(
         parent,
         colormap = cm,
