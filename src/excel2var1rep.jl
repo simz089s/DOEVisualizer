@@ -238,6 +238,8 @@ function create_save_button(fig, parent, lscene, filename)
         println("$(button.label[]) -> $filename.")
         lscene.scene.center = false
         save(filename, lscene.scene)
+        lscene.scene.center = true
+        display(fig)
     end
 
     button
