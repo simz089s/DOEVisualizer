@@ -125,14 +125,15 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
                 line_data[invar_data_dim_idx1] = invar_data_dim1
                 line_data[invar_data_dim_idx2] = invar_data_dim2
 
-                lines!(
+                scatterlines!(
                     lscene,
                     line_data[1], line_data[2], line_data[3],
                     # linestyle = :dash,
-                    linewidth = 2.,
+                    # linewidth = 2.,
                     # transparency = true,
                     # color = RGBAf0(0., 0., 0., .4),
-                    color = :gray,
+                    color = :black,
+                    markercolor = :black,
                     # show_axis = true,
                 )
             end
