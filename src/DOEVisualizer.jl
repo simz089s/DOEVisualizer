@@ -20,14 +20,13 @@ end
 function read_data(filename)
     df = CSV.File(filename) |> DataFrame
 
-    # First row after title should be indicating if the column is a variable or response
+    # First row after title should be indicating if the column is a variable or response (except for test number column)
     types = map(t -> ismissing(t) ? "" : t, df[1, :])
-    num_vars = count(t -> t == "variable", types)
-    num_resps = count(t -> t == "response", types)
-    # NUM_LVLS = 
+    # num_lvls = num_vars * num_resps
     # num_rows = nrow(df) - 1 # Exclude row indicating if it is a variable or response column
-    idx_miss = [i for (i, t) in enumerate(types) if t == ""] # Missing type column indices
-    select!(df, Not(idx_miss)) # TODO: clarify if (redundant) index row will always be there
+    # idx_miss = [i for (i, t) in enumerate(types) if t == ""] # Missing type column indices
+    # select!(df, Not(idx_miss)) # TODO: better way of knowing test number column
+    df[1, 1] = 0 # Change Missing test number to 0
     types = df[1, :]
     idx_vars = [i for (i, t) in enumerate(types) if t == "variable"] # Variables column indices
     idx_resps = [i for (i, t) in enumerate(types) if t == "response"] # Responses column indices
@@ -35,11 +34,13 @@ function read_data(filename)
     titles = replace.(names(df), " " => "_")
     rename!(df, titles)
     delete!(df, 1) # Remove the row indicating if it is a variable or response column
-    df[!, :] = parse.(Float64, df[!, :]) # Float64 for max compatibility with libraries...
+    # df[!, :] = parse.(Float64, df[!, :]) # Float64 for max compatibility with libraries...
+    # df[!, 1] = parse.(Int8, df[!, 1])
+    df[!, 2:end] = parse.(Float64, df[!, 2:end])
     vars = select(df, idx_vars)
     resps = select(df, idx_resps)
 
-    df, titles, vars, resps, num_vars, num_resps#, num_rows
+    df, titles[2:end], vars, resps, length(idx_vars), length(idx_resps)#, num_rows
 end
 
 
@@ -79,7 +80,7 @@ end
 
 # TODO: Find way to make relative size
 # Draw points and coordinates
-function create_points_coords(lscene, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     for (i, col) in enumerate(colors)
         scatter!(
             lscene,
@@ -90,11 +91,10 @@ function create_points_coords(lscene, resp, x, y, z, scal_x, scal_y, scal_z, sca
         )
         text!(
             lscene,
-            "$(resp[i, 1])",
-            # "$(No.)\n$(resp[i, 1])",
+            "#$(test_nums[i, 1])\n$(resp[i, 1])",
             position = Point3f0(
                 scal_x[i] + .25 / scal_plot_unit,
-                scal_y[i] + .1 / scal_plot_unit,
+                scal_y[i] + .2 / scal_plot_unit,
                 scal_z[i] + .2 / scal_plot_unit
             ),
             textsize = scal_plot_unit / 25.,
@@ -159,7 +159,8 @@ create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((title
 
 
 function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure())
-    x, y, z, n = get_xyzn(df)
+    df_no_test_num = select(df, Not(1))
+    x, y, z, n = get_xyzn(df_no_test_num)
     lvls = trunc(Int, sqrt(n))
 
     range_x, range_y, range_z,
@@ -180,7 +181,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     # TODO: better way of knowing variable vs response columns
     titles_vars = view(titles, 1:num_vars)
     titles_resp = view(titles, num_vars+1:num_vars+num_resps)
-    uniq_var_vals = sort.([ df[.!nonunique(select(df, title_var)), title_var] for title_var in titles_vars ]) # All unique values per variable
+    uniq_var_vals = sort.([ df_no_test_num[.!nonunique(select(df_no_test_num, title_var)), title_var] for title_var in titles_vars ]) # All unique values per variable
     n_uniq_var_vals = length(uniq_var_vals)
     # Scaled to value/interval
     scal_uniq_var_vals = uniq_var_vals[:, :]
@@ -196,7 +197,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     scal_z = z / range_z
     scal_plot_unit = mean(mean.((scal_x, scal_y, scal_z)))
 
-    axis = create_points_coords(lscene, select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    axis = create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors) # TODO: better way of knowing test_nums column
 
     create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
 
