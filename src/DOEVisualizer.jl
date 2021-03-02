@@ -158,6 +158,46 @@ end
 create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
 
 
+function create_colorbar(fig, parent, vals, title, cm)
+    vals = sort(vals[!, 1])
+    n = length(vals)
+    range_vals = 1:n
+
+    # cbar = Colorbar(
+    #     parent,
+    #     colormap = cm,
+    #     limits = extrema(vals),
+    #     label = title,
+    #     height = 25,
+    #     vertical = false,
+    #     ticks = LinearTicks(5),
+    # )
+
+    hm_ax = Axis(
+        parent,
+        xticks = (args...) -> (range_vals, string.(vals)),
+        title = title,
+        height = 25,
+    )
+
+    hm = heatmap!(
+        hm_ax,
+        range_vals,
+        # vals,
+        0:1,
+        reshape(range_vals, (n, 1)),
+        colormap = cm,
+        # colorrange = (vals[1], vals[end]),
+        label = title,
+        interpolate = true,
+    )
+
+    hideydecorations!(hm_ax, grid = false)
+
+    hm
+end
+
+
 function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure())
     df_no_test_num = select(df, Not(1))
     x, y, z, n = get_xyzn(df_no_test_num)
@@ -294,26 +334,23 @@ end
 # Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, cm)
     parent = fig[ pos_fig[1] + 1, pos_fig[2] ]
-    fig_content = parent.fig.content
+    # fig_content = parent.fig.content
+    fig_content = fig.content
 
     # Delete previous plot objects
     for i in 1:length(lscene.scene.plots)
         delete!(lscene.scene, lscene.scene.plots[1])
     end
-    cbar = filter(x -> typeof(x) == Colorbar, fig_content)[1]
+    # cbar = filter(x -> typeof(x) == Colorbar, fig_content)[1]
+    # delete!(cbar)
+    # GC.gc(true)
+    cbar = filter(x -> typeof(x) == Axis, fig_content)[1]
     delete!(cbar)
-    GC.gc(true)
+    # delete!(filter(x -> typeof(x) == LScene, fig_content)[1]) # TODO: Reverse create_plots LScene change and just remake it instead?
 
     lscene.title.val = title
     new_fig, new_lscene = create_plots(lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, fig = fig)
-    cbar = Colorbar(
-        parent,
-        colormap = cm,
-        limits = extrema(df[!, title]),
-        label = title,
-        height = 25,
-        vertical = false,
-    )
+    create_colorbar(fig, parent, select(df, title), title, cm)
     display(new_fig)
 end
 
@@ -327,15 +364,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     cm = :RdYlGn_3
 
     main_fig, main_ls = create_plots(df, titles, default_resp_title, titles_vars, num_vars, num_resps, pos_fig) # TODO: Generate which response plot by default?
-    cbar = Colorbar(
-        main_fig[ pos_fig[1] + 1, pos_fig[2] ],
-        colormap = cm,
-        limits = extrema(Array(default_resp)),
-        label = default_resp_title,
-        height = 25,
-        vertical = false,
-        ticks = LinearTicks(5),
-    )
+    cbar = create_colorbar(main_fig, main_fig[ pos_fig[1] + 1, pos_fig[2] ], default_resp, default_resp_title, cm)
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
     refresh_button = create_load_button(main_fig, main_fig[1, 2], main_ls, titles_vars, filename_data, pos_fig, cm)
