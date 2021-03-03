@@ -5,7 +5,7 @@
 # using PackageCompiler
 
 using CSV, DataFrames
-using Statistics
+using Statistics#, Interpolations
 using GLMakie#, AbstractPlotting#, Makie
 # using GLM, StatsModels
 
@@ -107,9 +107,11 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
 end
 
 
+ip(a) = vcat([[a[i], mean((a[i], a[i+1]))] for i in 1:length(a)-1]..., a[end])
+
 # Draw grid
 # TODO: probably use some permutation function to make it more elegant
-function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
+function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
     for var_dim_idx in 1:num_vars # scal_uniq_var_vals index of the dimension that will draw the line
         # scal_uniq_var_vals index of the other invariant dimensions
         invar_data_dim_idx1 = mod1(var_dim_idx + 1, 3)
@@ -124,17 +126,30 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
                 line_data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
                 line_data[invar_data_dim_idx1] = invar_data_dim1
                 line_data[invar_data_dim_idx2] = invar_data_dim2
+                # scatterlines!(
+                #     lscene,
+                #     line_data[1], line_data[2], line_data[3],
+                #     # linestyle = :dash,
+                #     # linewidth = 2.,
+                #     # transparency = true,
+                #     # color = RGBAf0(0., 0., 0., .4),
+                #     color = :black,
+                #     markercolor = :black,
+                #     markersize = scal_plot_unit * 10.,
+                #     # show_axis = true,
+                # )
 
-                scatterlines!(
+                for i in 1:3
+                    line_data[1] = ip(line_data[1])
+                    line_data[2] = ip(line_data[2])
+                    line_data[3] = ip(line_data[3])
+                end
+                scatter!(
                     lscene,
                     line_data[1], line_data[2], line_data[3],
-                    # linestyle = :dash,
-                    # linewidth = 2.,
-                    # transparency = true,
-                    # color = RGBAf0(0., 0., 0., .4),
                     color = :black,
-                    markercolor = :black,
-                    # show_axis = true,
+                    marker = :rect,
+                    markersize = scal_plot_unit,
                 )
             end
         end
@@ -171,7 +186,7 @@ function create_colorbar(fig, parent, vals, title, cm)
     #     label = title,
     #     height = 25,
     #     vertical = false,
-    #     ticks = LinearTicks(5),
+    #     ticks = (args...) -> (range_vals, string.(vals)),
     # )
 
     hm_ax = Axis(
@@ -184,11 +199,9 @@ function create_colorbar(fig, parent, vals, title, cm)
     hm = heatmap!(
         hm_ax,
         range_vals,
-        # vals,
         0:1,
         reshape(range_vals, (n, 1)),
         colormap = cm,
-        # colorrange = (vals[1], vals[end]),
         label = title,
         interpolate = true,
     )
@@ -240,7 +253,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
 
     axis = create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors) # TODO: better way of knowing test_nums column
 
-    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals)
+    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
 
     create_arrows(lscene, scal_uniq_var_vals)
 
