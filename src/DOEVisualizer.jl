@@ -5,6 +5,7 @@
 # using PackageCompiler
 
 using CSV, DataFrames
+using Unicode
 using Statistics#, Interpolations
 using GLMakie#, AbstractPlotting#, Makie
 # using GLM, StatsModels
@@ -14,6 +15,15 @@ using GLMakie#, AbstractPlotting#, Makie
 function peek(thing)
     println(fieldnames(typeof(thing)))
     println(thing)
+end
+
+
+function find_csv(dir)
+    for file in readdir(dir)
+        if Unicode.normalize(last(file, 4), casefold = true) == ".csv" # Find first file that ends with .csv (case insensitive)
+            return "$dir/$file"
+        end
+    end
 end
 
 
@@ -393,7 +403,7 @@ end
 
 
 function main(args)
-    filename_data = args[1]
+    filename_data = isempty(args[1]) ? find_csv("$(@__DIR__)/../res") : args[1]
     filename_save = args[2]
 
     df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
@@ -404,7 +414,7 @@ end
 
 
 args = (
-    "res/heat_treatement_data_2.csv",
+    "",
     "taguchi.png",
 )
 # args = readline()
