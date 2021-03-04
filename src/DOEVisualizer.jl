@@ -139,7 +139,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
                 #     # show_axis = true,
                 # )
 
-                for i in 1:3
+                for i in 1:2
                     line_data[1] = ip(line_data[1])
                     line_data[2] = ip(line_data[2])
                     line_data[3] = ip(line_data[3])
@@ -149,7 +149,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
                     line_data[1], line_data[2], line_data[3],
                     color = :black,
                     marker = :rect,
-                    markersize = scal_plot_unit,
+                    markersize = scal_plot_unit * 5.,
                 )
             end
         end
