@@ -81,13 +81,14 @@ end
 # TODO: Find way to make relative size
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    scatter!(lscene, [min(scal_x...)], [min(scal_y...)], [min(scal_z...)], markersize = scal_plot_unit * 80., marker = :star5, color = :black, show_axis = true) # Show point zero
     for (i, col) in enumerate(colors)
         scatter!(
             lscene,
             scal_x[i:i], scal_y[i:i], scal_z[i:i],
             markersize = scal_plot_unit * 40., marker = :circle,
             color = col,
-            show_axis = true,
+            # show_axis = true,
         )
         text!(
             lscene,
