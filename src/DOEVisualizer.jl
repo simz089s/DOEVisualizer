@@ -303,6 +303,23 @@ create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = 
     ), df, titles, title, titles_var, num_vars, num_resps, pos_fig, fig = fig)
 
 
+# function loading_bar()
+#     fig = Figure()
+#     ax = Axis(
+#         fig,
+#     )
+#     text!(
+#         ax,
+#         "LOADING...",
+#         position = Point2f0(0., 0.),
+#         textsize = .5,
+#         color = :black,
+#         overdraw = true,
+#     )
+#     fig
+# end
+
+
 function create_save_button(fig, parent, lscene, filename)
     button = Button(
         parent,
@@ -334,9 +351,11 @@ function create_reload_button(fig, parent, lscene, filename, pos_fig, cm)
         titles_vars = names(vars)
         titles_resps = names(resps)
         reload_plot(fig, lscene, df, titles, titles_resps[1], titles_vars, num_vars, num_resps, pos_fig, cm)
+        menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
         # menus.options[] = titles_resps
-        delete!(filter(x -> typeof(x) == Menu, fig.content)[1])
-        create_menus(fig, fig[1, 3], lscene, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
+        # menus.visible = false
+        delete!(menus)
+        create_menus(fig, fig[1, 3:4], lscene, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
     end
 
     button
@@ -373,6 +392,9 @@ end
 
 # Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, cm)
+    # lbar = loading_bar()
+    display(Figure()) # Triggers built-in loading bar for some reason ¯\_(¬_¬)_/¯
+
     parent = fig[ pos_fig[1], max(pos_fig[2]...) + 1 ]
     # fig_content = parent.fig.content
     fig_content = fig.content
