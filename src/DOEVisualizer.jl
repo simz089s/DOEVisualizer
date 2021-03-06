@@ -312,16 +312,22 @@ function create_save_button(fig, parent, lscene, filename)
 end
 
 
-function create_load_button(fig, parent, lscene, titles_vars, filename, pos_fig, cm)
+# TODO: Load? Reload?
+function create_reload_button(fig, parent, lscene, filename, pos_fig, cm)
     button = Button(
         parent,
-        label = "Load",
+        label = "Reload",
     )
 
     on(button.clicks) do n
-        df, titles, _, _, num_vars, num_resps = read_data(filename)
         println("$(button.label[]) -> $filename.")
-        reload_plot(fig, lscene, df, titles, lscene.title.val, titles_vars, num_vars, num_resps, pos_fig, cm)
+        df, titles, vars, resps, num_vars, num_resps = read_data(filename)
+        titles_vars = names(vars)
+        titles_resps = names(resps)
+        reload_plot(fig, lscene, df, titles, titles_resps[1], titles_vars, num_vars, num_resps, pos_fig, cm)
+        # menus.options[] = titles_resps
+        delete!(filter(x -> typeof(x) == Menu, fig.content)[1])
+        create_menus(fig, fig[1, 3], lscene, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
     end
 
     button
@@ -394,8 +400,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     cbar = create_colorbar(main_fig, main_fig[ pos_fig[1] + 1, pos_fig[2] ], default_resp, default_resp_title, cm)
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
-    refresh_button = create_load_button(main_fig, main_fig[1, 2], main_ls, titles_vars, filename_data, pos_fig, cm)
-    menus = create_menus(main_fig, main_fig[1, 3], main_ls, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
+    menus = create_menus(main_fig, main_fig[1, 3], main_ls, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
+    reload_button = create_reload_button(main_fig, main_fig[1, 2], main_ls, filename_data, pos_fig, cm)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
     trim!(main_fig.layout)
