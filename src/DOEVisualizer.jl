@@ -1,12 +1,12 @@
-# module excel2var1rep
+# module DOEVisualizer
 
 @info "Pre-compiling..."
 
 # using PackageCompiler
 
-using CSV, DataFrames
 using Unicode
 using Statistics#, Interpolations
+using CSV, DataFrames
 using GLMakie#, AbstractPlotting#, Makie
 # using GLM, StatsModels
 
@@ -96,7 +96,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         scatter!(
             lscene,
             scal_x[i:i], scal_y[i:i], scal_z[i:i],
-            markersize = scal_plot_unit * 40., marker = :circle,
+            markersize = scal_plot_unit * 35., marker = :circle,
             color = col,
             # show_axis = true,
         )
@@ -118,7 +118,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
 end
 
 
-ip(a) = vcat([[a[i], mean((a[i], a[i+1]))] for i in 1:length(a)-1]..., a[end])
+# ip(a) = vcat([[a[i], mean((a[i], a[i+1]))] for i in 1:length(a)-1]..., a[end])
 
 # Draw grid
 # TODO: probably use some permutation function to make it more elegant
@@ -137,31 +137,31 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
                 line_data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
                 line_data[invar_data_dim_idx1] = invar_data_dim1
                 line_data[invar_data_dim_idx2] = invar_data_dim2
-                # scatterlines!(
-                #     lscene,
-                #     line_data[1], line_data[2], line_data[3],
-                #     # linestyle = :dash,
-                #     # linewidth = 2.,
-                #     # transparency = true,
-                #     # color = RGBAf0(0., 0., 0., .4),
-                #     color = :black,
-                #     markercolor = :black,
-                #     markersize = scal_plot_unit * 10.,
-                #     # show_axis = true,
-                # )
-
-                for i in 1:2
-                    line_data[1] = ip(line_data[1])
-                    line_data[2] = ip(line_data[2])
-                    line_data[3] = ip(line_data[3])
-                end
-                scatter!(
+                scatterlines!(
                     lscene,
                     line_data[1], line_data[2], line_data[3],
+                    # linestyle = :dash,
+                    # linewidth = 2.,
+                    # transparency = true,
+                    # color = RGBAf0(0., 0., 0., .4),
                     color = :black,
-                    marker = :rect,
-                    markersize = scal_plot_unit * 5.,
+                    markercolor = :black,
+                    markersize = scal_plot_unit * 10.,
+                    # show_axis = true,
                 )
+
+                # for i in 1:2
+                #     line_data[1] = ip(line_data[1])
+                #     line_data[2] = ip(line_data[2])
+                #     line_data[3] = ip(line_data[3])
+                # end
+                # scatter!(
+                #     lscene,
+                #     line_data[1], line_data[2], line_data[3],
+                #     color = :black,
+                #     marker = :rect,
+                #     markersize = scal_plot_unit * 5.,
+                # )
             end
         end
     end
@@ -388,7 +388,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     default_resp_title = names(default_resp)[1]
     cm = :RdYlGn_3
 
+    @info "Creating main plot..."
     main_fig, main_ls = create_plots(df, titles, default_resp_title, titles_vars, num_vars, num_resps, pos_fig) # TODO: Generate which response plot by default?
+    @info "Creating other widgets..."
     cbar = create_colorbar(main_fig, main_fig[ pos_fig[1] + 1, pos_fig[2] ], default_resp, default_resp_title, cm)
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
