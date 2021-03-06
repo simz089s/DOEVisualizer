@@ -190,7 +190,7 @@ create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((title
 function create_colorbar(fig, parent, vals, title, cm)
     vals = sort(vals[!, 1])
     n = length(vals)
-    range_vals = calc_range(vals)
+    # range_vals = calc_range(vals)
     vals_range = 1:n
 
     # cbar = Colorbar(
@@ -206,7 +206,7 @@ function create_colorbar(fig, parent, vals, title, cm)
     hm_ax = Axis(
         parent,
         # yticks = (args...) -> (vals_range, string.(vals)),
-        yticks = LinearTicks(trunc(Int, range_vals)),
+        yticks = LinearTicks(n),
         title = title,
         width = 25,
         # yaxisposition = :right,
@@ -238,7 +238,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     range_x, range_y, range_z,
         ext_x, ext_y, ext_z,
         scal_ext_x, scal_ext_y, scal_ext_z = get_ranges(x, y, z)
-    range_resp = trunc(Int, calc_range(select(df, title)[!, 1]) * 100) # To increase precision to 2 decimals
+    range_resp = calc_range(select(df, title)[!, 1])
 
     # Scale data to data/interval so that the plot is unit/equal sized
     xtickrange = range(scal_ext_x..., length = lvls)
@@ -250,7 +250,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     zticklabels = string.(range(ext_z..., length = lvls))
 
     # colors = to_colormap(:RdYlGn_3, n) # Get N colors from colormap to represent response variable TODO: allow choosing colormap?
-    colors = to_colormap(:RdYlGn_3, range_resp)
+    colors = to_colormap(:RdYlGn_3, trunc(Int, range_resp * 100)) # To increase precision to 2 decimals
 
     # TODO: better way of knowing variable vs response columns
     titles_vars = view(titles, 1:num_vars)
@@ -373,7 +373,7 @@ end
 
 # Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, cm)
-    parent = fig[ pos_fig[1] + 1, pos_fig[2] ]
+    parent = fig[ pos_fig[1], max(pos_fig[2]...) + 1 ]
     # fig_content = parent.fig.content
     fig_content = fig.content
 
@@ -406,7 +406,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     @info "Creating main plot..."
     main_fig, main_ls = create_plots(df, titles, default_resp_title, titles_vars, num_vars, num_resps, pos_fig) # TODO: Generate which response plot by default?
     @info "Creating other widgets..."
-    cbar = create_colorbar(main_fig, main_fig[ 2, 4 ], default_resp, default_resp_title, cm)
+    cbar = create_colorbar(main_fig, main_fig[ pos_fig[1], max(pos_fig[2]...) + 1 ], default_resp, default_resp_title, cm)
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
     menus = create_menus(main_fig, main_fig[1, 3:4], main_ls, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
