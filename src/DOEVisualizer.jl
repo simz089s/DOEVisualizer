@@ -92,7 +92,9 @@ end
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     scatter!(lscene, [min(scal_x...)], [min(scal_y...)], [min(scal_z...)], markersize = scal_plot_unit * 80., marker = :star5, color = :black, show_axis = true) # Show point zero
-    for (i, col) in enumerate(colors)
+    # for (i, col) in enumerate(colors)
+    for i in 1:nrow(test_nums)
+        col = colors[floor(Int, (resp[i, 1] - min(resp[!, 1]...))) * 100 + 1] # To get properly scaled colour
         scatter!(
             lscene,
             scal_x[i:i], scal_y[i:i], scal_z[i:i],
@@ -188,7 +190,8 @@ create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((title
 function create_colorbar(fig, parent, vals, title, cm)
     vals = sort(vals[!, 1])
     n = length(vals)
-    range_vals = 1:n
+    range_vals = calc_range(vals)
+    vals_range = 1:n
 
     # cbar = Colorbar(
     #     parent,
@@ -197,12 +200,13 @@ function create_colorbar(fig, parent, vals, title, cm)
     #     label = title,
     #     height = 25,
     #     vertical = false,
-    #     ticks = (args...) -> (range_vals, string.(vals)),
+    #     ticks = (args...) -> (vals_range, string.(vals)),
     # )
 
     hm_ax = Axis(
         parent,
-        yticks = (args...) -> (range_vals, string.(vals)),
+        # yticks = (args...) -> (vals_range, string.(vals)),
+        yticks = LinearTicks(trunc(Int, range_vals)),
         title = title,
         width = 25,
         # yaxisposition = :right,
@@ -213,8 +217,8 @@ function create_colorbar(fig, parent, vals, title, cm)
     hm = heatmap!(
         hm_ax,
         0:1,
-        range_vals,
-        reverse(reshape(range_vals, (1, n)), dims = 2),
+        vals,
+        reshape(vals_range, (1, n)),
         colormap = cm,
         label = title,
         interpolate = true,
@@ -234,6 +238,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     range_x, range_y, range_z,
         ext_x, ext_y, ext_z,
         scal_ext_x, scal_ext_y, scal_ext_z = get_ranges(x, y, z)
+    range_resp = trunc(Int, calc_range(select(df, title)[!, 1]) * 100) # To increase precision to 2 decimals
 
     # Scale data to data/interval so that the plot is unit/equal sized
     xtickrange = range(scal_ext_x..., length = lvls)
@@ -244,7 +249,8 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     yticklabels = string.(range(ext_y..., length = lvls))
     zticklabels = string.(range(ext_z..., length = lvls))
 
-    colors = to_colormap(:RdYlGn_3, n) # Get N colors from colormap to represent response variable TODO: allow choosing colormap?
+    # colors = to_colormap(:RdYlGn_3, n) # Get N colors from colormap to represent response variable TODO: allow choosing colormap?
+    colors = to_colormap(:RdYlGn_3, range_resp)
 
     # TODO: better way of knowing variable vs response columns
     titles_vars = view(titles, 1:num_vars)
