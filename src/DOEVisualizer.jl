@@ -202,22 +202,25 @@ function create_colorbar(fig, parent, vals, title, cm)
 
     hm_ax = Axis(
         parent,
-        xticks = (args...) -> (range_vals, string.(vals)),
+        yticks = (args...) -> (range_vals, string.(vals)),
         title = title,
-        height = 25,
+        width = 25,
+        # yaxisposition = :right,
+        ylabel = title,
+        flip_ylabel = true,
     )
 
     hm = heatmap!(
         hm_ax,
-        range_vals,
         0:1,
-        reshape(range_vals, (n, 1)),
+        range_vals,
+        reverse(reshape(range_vals, (1, n)), dims = 2),
         colormap = cm,
         label = title,
         interpolate = true,
     )
 
-    hideydecorations!(hm_ax, grid = false)
+    hidexdecorations!(hm_ax, grid = false)
 
     hm
 end
@@ -397,10 +400,10 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     @info "Creating main plot..."
     main_fig, main_ls = create_plots(df, titles, default_resp_title, titles_vars, num_vars, num_resps, pos_fig) # TODO: Generate which response plot by default?
     @info "Creating other widgets..."
-    cbar = create_colorbar(main_fig, main_fig[ pos_fig[1] + 1, pos_fig[2] ], default_resp, default_resp_title, cm)
+    cbar = create_colorbar(main_fig, main_fig[ 2, 4 ], default_resp, default_resp_title, cm)
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
-    menus = create_menus(main_fig, main_fig[1, 3], main_ls, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
+    menus = create_menus(main_fig, main_fig[1, 3:4], main_ls, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
     reload_button = create_reload_button(main_fig, main_fig[1, 2], main_ls, filename_data, pos_fig, cm)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
