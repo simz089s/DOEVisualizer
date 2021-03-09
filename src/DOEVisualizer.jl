@@ -10,7 +10,7 @@ using CSV, DataFrames
 using GLMakie#, AbstractPlotting#, Makie
 # using GLM, StatsModels
 
-# include("DOEVDBManager.jl")
+include("DOEVDBManager.jl")
 # using DOEVDBManager
 
 @info "Loading functions..."
