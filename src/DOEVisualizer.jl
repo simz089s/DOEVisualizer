@@ -1,4 +1,4 @@
-# module DOEVisualizer
+module DOEVisualizer
 
 @info "Pre-compiling..."
 
@@ -9,6 +9,9 @@ using Statistics#, Interpolations
 using CSV, DataFrames
 using GLMakie#, AbstractPlotting#, Makie
 # using GLM, StatsModels
+
+# include("DOEVDBManager.jl")
+# using DOEVDBManager
 
 @info "Loading functions..."
 
@@ -441,14 +444,20 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
 end
 
 
-function main(args)
+function __init__()
     filename_data = isempty(args[1]) ? find_csv("$(@__DIR__)/../res") : args[1]
     filename_save = args[2]
-
+    
     df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
+    
+    df_test = DOEVDBManager.test("../db.db", "HEAT_TREATMENT_DATA_2")
+    display(df_test)
 
     @info "Setting up interface and plots..."
     setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
+
+    # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
+    # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
 end
 
 
@@ -457,9 +466,5 @@ args = (
     "taguchi.png",
 )
 # args = readline()
-main(args)
 
-# f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
-# model = glm(f, select(df, 1:4), Normal(), IdentityLink())
-
-# end
+end
