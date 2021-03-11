@@ -1,6 +1,6 @@
 module DOEVisualizer
 
-@info "Pre-compiling..."
+@info "Loading libraries..."
 
 # using PackageCompiler
 
