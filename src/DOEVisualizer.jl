@@ -94,7 +94,7 @@ end
 # TODO: Find way to make relative size
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
-    scatter!(lscene, [min(scal_x...)], [min(scal_y...)], [min(scal_z...)], markersize = scal_plot_unit * 80., marker = :star5, color = :black, show_axis = true) # Show point zero
+    # scatter!(lscene, [min(scal_x...)], [min(scal_y...)], [min(scal_z...)], markersize = scal_plot_unit * 80., marker = :star5, color = :black, show_axis = true) # Show point zero
     resp_min = min(resp[!, 1]...)
     for i in 1:nrow(test_nums)
         col = colors[floor(Int, (resp[i, 1] - resp_min)) * 100 + 1] # To get properly scaled colour
@@ -103,6 +103,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
             scal_x[i:i], scal_y[i:i], scal_z[i:i],
             markersize = scal_plot_unit * 35., marker = :circle,
             color = col,
+            show_axis = true,
         )
         text!(
             lscene,
@@ -156,18 +157,18 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
 end
 
 
-function create_arrows(lscene, vals, scal_plot_unit)
-    arrows!(
-        lscene,
-        fill(Point3f0(vals[1][1], vals[2][1], vals[3][1]), 3),
-        [ Point3f0(1, 0, 0), Point3f0(0, 1, 0), Point3f0(0, 0, 1), ],
-        arrowcolor = :gray,
-        arrowsize = scal_plot_unit / 20.,
-        linecolor = :black,
-        # linewidth = 5.,
-        lengthscale = scal_plot_unit / 1.5,
-    )
-end
+# function create_arrows(lscene, vals, scal_plot_unit)
+#     arrows!(
+#         lscene,
+#         fill(Point3f0(vals[1][1], vals[2][1], vals[3][1]), 3),
+#         [ Point3f0(1, 0, 0), Point3f0(0, 1, 0), Point3f0(0, 0, 1), ],
+#         arrowcolor = :gray,
+#         arrowsize = scal_plot_unit / 20.,
+#         linecolor = :black,
+#         # linewidth = 5.,
+#         lengthscale = scal_plot_unit / 1.5,
+#     )
+# end
 
 
 create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
@@ -237,7 +238,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     
     axis = create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors) # TODO: better way of knowing test_nums column
 
-    create_arrows(lscene, scal_uniq_var_vals, scal_plot_unit)
+    # create_arrows(lscene, scal_uniq_var_vals, scal_plot_unit)
 
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
@@ -245,7 +246,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
 
     axis[:showaxis] = true
     axis[:showgrid] = false
-    axis[:frame, :axiscolor] = RGBAf0(0., 0., 0., .3)
+    axis[:frame, :axiscolor] = :black
     # axis[:frame, :linecolor] = :black # Unneeded because `showgrid=false`
     axis[:ticks, :textcolor] = :black
 
