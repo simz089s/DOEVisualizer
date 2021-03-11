@@ -5,9 +5,9 @@ module DOEVisualizer
 # using PackageCompiler
 
 using Unicode
-using Statistics#, Interpolations
+using Statistics
 using CSV, DataFrames
-using GLMakie#, AbstractPlotting#, Makie
+using GLMakie
 # using GLM, StatsModels
 
 include("DOEVDBManager.jl")
@@ -95,15 +95,14 @@ end
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     scatter!(lscene, [min(scal_x...)], [min(scal_y...)], [min(scal_z...)], markersize = scal_plot_unit * 80., marker = :star5, color = :black, show_axis = true) # Show point zero
-    # for (i, col) in enumerate(colors)
+    resp_min = min(resp[!, 1]...)
     for i in 1:nrow(test_nums)
-        col = colors[floor(Int, (resp[i, 1] - min(resp[!, 1]...))) * 100 + 1] # To get properly scaled colour
+        col = colors[floor(Int, (resp[i, 1] - resp_min)) * 100 + 1] # To get properly scaled colour
         scatter!(
             lscene,
             scal_x[i:i], scal_y[i:i], scal_z[i:i],
             markersize = scal_plot_unit * 35., marker = :circle,
             color = col,
-            # show_axis = true,
         )
         text!(
             lscene,
@@ -122,8 +121,6 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     lscene.scene[OldAxis]
 end
 
-
-# ip(a) = vcat([[a[i], mean((a[i], a[i+1]))] for i in 1:length(a)-1]..., a[end])
 
 # Draw grid
 # TODO: probably use some permutation function to make it more elegant
@@ -150,39 +147,25 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
                     # transparency = true,
                     # color = RGBAf0(0., 0., 0., .4),
                     color = :black,
-                    markercolor = :black,
-                    markersize = scal_plot_unit * 10.,
-                    # show_axis = true,
+                    markercolor = :white,
+                    markersize = scal_plot_unit * 35.,
                 )
-
-                # for i in 1:2
-                #     line_data[1] = ip(line_data[1])
-                #     line_data[2] = ip(line_data[2])
-                #     line_data[3] = ip(line_data[3])
-                # end
-                # scatter!(
-                #     lscene,
-                #     line_data[1], line_data[2], line_data[3],
-                #     color = :black,
-                #     marker = :rect,
-                #     markersize = scal_plot_unit * 5.,
-                # )
             end
         end
     end
 end
 
 
-function create_arrows(lscene, vals)
+function create_arrows(lscene, vals, scal_plot_unit)
     arrows!(
         lscene,
         fill(Point3f0(vals[1][1], vals[2][1], vals[3][1]), 3),
         [ Point3f0(1, 0, 0), Point3f0(0, 1, 0), Point3f0(0, 0, 1), ],
         arrowcolor = :gray,
-        arrowsize = .1,
+        arrowsize = scal_plot_unit / 20.,
         linecolor = :black,
         # linewidth = 5.,
-        lengthscale = 1.25,
+        lengthscale = scal_plot_unit / 1.5,
     )
 end
 
@@ -193,43 +176,45 @@ create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((title
 function create_colorbar(fig, parent, vals, title, cm)
     vals = sort(vals[!, 1])
     n = length(vals)
-    # range_vals = calc_range(vals)
     vals_range = 1:n
 
-    # cbar = Colorbar(
+    cbar = Colorbar(
+        parent,
+        # ticks = (args...) -> (vals_range, string.(vals)),
+        ticks = LinearTicks(n),
+        label = title,
+        width = 25,
+        flipaxis = false,
+        flip_vertical_label = true,
+        limits = extrema(vals),
+        colormap = cm,
+        vertical = true,
+    )
+
+    # hm_ax = Axis(
     #     parent,
-    #     colormap = cm,
-    #     limits = extrema(vals),
-    #     label = title,
-    #     height = 25,
-    #     vertical = false,
-    #     ticks = (args...) -> (vals_range, string.(vals)),
+    #     # yticks = (args...) -> (vals_range, string.(vals)),
+    #     yticks = LinearTicks(n),
+    #     title = title,
+    #     width = 25,
+    #     # yaxisposition = :right,
+    #     ylabel = title,
+    #     flip_ylabel = true,
     # )
 
-    hm_ax = Axis(
-        parent,
-        # yticks = (args...) -> (vals_range, string.(vals)),
-        yticks = LinearTicks(n),
-        title = title,
-        width = 25,
-        # yaxisposition = :right,
-        ylabel = title,
-        flip_ylabel = true,
-    )
+    # hm = heatmap!(
+    #     hm_ax,
+    #     0:1,
+    #     vals,
+    #     reshape(vals_range, (1, n)),
+    #     colormap = cm,
+    #     label = title,
+    #     interpolate = true,
+    # )
 
-    hm = heatmap!(
-        hm_ax,
-        0:1,
-        vals,
-        reshape(vals_range, (1, n)),
-        colormap = cm,
-        label = title,
-        interpolate = true,
-    )
+    # hidexdecorations!(hm_ax, grid = false)
 
-    hidexdecorations!(hm_ax, grid = false)
-
-    hm
+    # hm
 end
 
 
@@ -253,7 +238,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     zticklabels = string.(range(ext_z..., length = lvls))
 
     # colors = to_colormap(:RdYlGn_3, n) # Get N colors from colormap to represent response variable TODO: allow choosing colormap?
-    colors = to_colormap(:RdYlGn_3, trunc(Int, range_resp * 100)) # To increase precision to 2 decimals
+    colors = to_colormap(:RdYlGn_3, round(Int, range_resp * 100, RoundUp)) # To increase precision to 2 decimals
 
     # TODO: better way of knowing variable vs response columns
     titles_vars = view(titles, 1:num_vars)
@@ -274,11 +259,11 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     scal_z = z / range_z
     scal_plot_unit = mean(mean.((scal_x, scal_y, scal_z)))
 
+    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
+    
     axis = create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors) # TODO: better way of knowing test_nums column
 
-    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
-
-    create_arrows(lscene, scal_uniq_var_vals)
+    create_arrows(lscene, scal_uniq_var_vals, scal_plot_unit)
 
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
@@ -286,7 +271,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
 
     axis[:showaxis] = true
     axis[:showgrid] = false
-    axis[:frame, :axiscolor] = :black
+    axis[:frame, :axiscolor] = RGBAf0(0., 0., 0., .3)
     # axis[:frame, :linecolor] = :black # Unneeded because `showgrid=false`
     axis[:ticks, :textcolor] = :black
 
