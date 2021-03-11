@@ -94,17 +94,17 @@ end
 # TODO: Find way to make relative size
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
-    # scatter!(lscene, [min(scal_x...)], [min(scal_y...)], [min(scal_z...)], markersize = scal_plot_unit * 80., marker = :star5, color = :black, show_axis = true) # Show point zero
+    n = nrow(test_nums)
+    colors_used = Array{RGBf0, 1}(undef, n)
+    scal_xyz = Array{Point3f0, 1}(undef, n)
+
     resp_min = min(resp[!, 1]...)
-    for i in 1:nrow(test_nums)
+    for i in 1:n
         col = colors[floor(Int, (resp[i, 1] - resp_min)) * 100 + 1] # To get properly scaled colour
-        scatter!(
-            lscene,
-            scal_x[i:i], scal_y[i:i], scal_z[i:i],
-            markersize = scal_plot_unit * 35., marker = :circle,
-            color = col,
-            show_axis = true,
-        )
+        colors_used[i] = col
+
+        scal_xyz[i] = Point3f0( scal_x[i], scal_y[i], scal_z[i] )
+
         text!(
             lscene,
             "#$(test_nums[i, 1])\n$(resp[i, 1])",
@@ -119,7 +119,15 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
             overdraw = true,
         )
     end
-    lscene.scene[OldAxis]
+
+    scatter!(
+        lscene,
+        scal_x, scal_y, scal_z,
+        markersize = scal_plot_unit * 35., marker = :circle,
+        color = colors_used, # Give properly sampled colours
+    )
+    splot = lscene.scene[end]
+    splot[1].val = scal_xyz # Insert properly ordered/sorted points to match colours
 end
 
 
@@ -155,20 +163,6 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
         end
     end
 end
-
-
-# function create_arrows(lscene, vals, scal_plot_unit)
-#     arrows!(
-#         lscene,
-#         fill(Point3f0(vals[1][1], vals[2][1], vals[3][1]), 3),
-#         [ Point3f0(1, 0, 0), Point3f0(0, 1, 0), Point3f0(0, 0, 1), ],
-#         arrowcolor = :gray,
-#         arrowsize = scal_plot_unit / 20.,
-#         linecolor = :black,
-#         # linewidth = 5.,
-#         lengthscale = scal_plot_unit / 1.5,
-#     )
-# end
 
 
 create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
@@ -235,19 +229,18 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     scal_plot_unit = mean(mean.((scal_x, scal_y, scal_z)))
 
     create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
-    
-    axis = create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors) # TODO: better way of knowing test_nums column
 
-    # create_arrows(lscene, scal_uniq_var_vals, scal_plot_unit)
+    axis = lscene.scene[OldAxis]
+    axis[:showaxis] = true
+
+    create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors) # TODO: better way of knowing test_nums column
 
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
     zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
 
-    axis[:showaxis] = true
     axis[:showgrid] = false
-    axis[:frame, :axiscolor] = :black
-    # axis[:frame, :linecolor] = :black # Unneeded because `showgrid=false`
+    # axis[:frame, :axiscolor] = :black
     axis[:ticks, :textcolor] = :black
 
     create_titles(lscene, axis, titles_var)
@@ -409,8 +402,8 @@ function __init__()
     
     df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
     
-    df_test = DOEVDBManager.test("../db.db", "HEAT_TREATMENT_DATA_2")
-    display(df_test)
+    # df_test = DOEVDBManager.test("../db.db", "HEAT_TREATMENT_DATA_2")
+    # display(df_test)
 
     @info "Setting up interface and plots..."
     setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
