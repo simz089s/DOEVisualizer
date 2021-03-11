@@ -180,7 +180,6 @@ function create_colorbar(fig, parent, vals, title, cm)
 
     cbar = Colorbar(
         parent,
-        # ticks = (args...) -> (vals_range, string.(vals)),
         ticks = LinearTicks(n),
         label = title,
         width = 25,
@@ -190,31 +189,6 @@ function create_colorbar(fig, parent, vals, title, cm)
         colormap = cm,
         vertical = true,
     )
-
-    # hm_ax = Axis(
-    #     parent,
-    #     # yticks = (args...) -> (vals_range, string.(vals)),
-    #     yticks = LinearTicks(n),
-    #     title = title,
-    #     width = 25,
-    #     # yaxisposition = :right,
-    #     ylabel = title,
-    #     flip_ylabel = true,
-    # )
-
-    # hm = heatmap!(
-    #     hm_ax,
-    #     0:1,
-    #     vals,
-    #     reshape(vals_range, (1, n)),
-    #     colormap = cm,
-    #     label = title,
-    #     interpolate = true,
-    # )
-
-    # hidexdecorations!(hm_ax, grid = false)
-
-    # hm
 end
 
 
@@ -291,8 +265,8 @@ create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = 
     ), df, titles, title, titles_var, num_vars, num_resps, pos_fig, fig = fig)
 
 
-# function loading_bar()
-#     fig = Figure()
+function loading_bar()
+    fig = Figure()
 #     ax = Axis(
 #         fig,
 #     )
@@ -305,7 +279,9 @@ create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = 
 #         overdraw = true,
 #     )
 #     fig
-# end
+    display(fig) # Triggers built-in loading bar for some reason ¯\_(¬_¬)_/¯
+    fig
+end
 
 
 function create_save_button(fig, parent, lscene, filename)
@@ -380,8 +356,7 @@ end
 
 # Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, cm)
-    # lbar = loading_bar()
-    display(Figure()) # Triggers built-in loading bar for some reason ¯\_(¬_¬)_/¯
+    lbar = loading_bar()
 
     parent = fig[ pos_fig[1], max(pos_fig[2]...) + 1 ]
     # fig_content = parent.fig.content
@@ -391,11 +366,9 @@ function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_
     for i in 1:length(lscene.scene.plots)
         delete!(lscene.scene, lscene.scene.plots[1])
     end
-    # cbar = filter(x -> typeof(x) == Colorbar, fig_content)[1]
-    # delete!(cbar)
-    # GC.gc(true)
-    cbar = filter(x -> typeof(x) == Axis, fig_content)[1]
+    cbar = filter(x -> typeof(x) == Colorbar, fig_content)[1]
     delete!(cbar)
+    # GC.gc(true)
     # delete!(filter(x -> typeof(x) == LScene, fig_content)[1]) # TODO: Reverse create_plots LScene change and just remake it instead?
 
     lscene.title.val = title
