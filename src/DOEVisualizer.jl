@@ -127,7 +127,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         color = colors_used, # Give properly sampled colours
     )
     splot = lscene.scene[end]
-    splot[1].val = scal_xyz # Insert properly ordered/sorted points to match colours
+    splot[1].val = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
 end
 
 
@@ -157,7 +157,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
                     # color = RGBAf0(0., 0., 0., .4),
                     color = :black,
                     markercolor = :white,
-                    markersize = scal_plot_unit * 35.,
+                    markersize = scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
                 )
             end
         end
