@@ -308,12 +308,10 @@ function create_reload_button(fig, parent, lscene, filename, pos_fig, cm)
         df, titles, vars, resps, num_vars, num_resps = read_data(filename)
         titles_vars = names(vars)
         titles_resps = names(resps)
-        reload_plot(fig, lscene, df, titles, titles_resps[1], titles_vars, num_vars, num_resps, pos_fig, cm)
         menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
-        # menus.options[] = titles_resps
-        # menus.visible = false
         delete!(menus)
         create_menus(fig, fig[1, 3:4], lscene, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
+        reload_plot(fig, lscene, df, titles, titles_resps[1], titles_vars, num_vars, num_resps, pos_fig, cm)
     end
 
     button
@@ -357,9 +355,10 @@ function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_
     fig_content = fig.content
 
     # Delete previous plot objects
-    for i in 1:length(lscene.scene.plots)
-        delete!(lscene.scene, lscene.scene.plots[1])
-    end
+    # for i in 1:length(lscene.scene)
+    #     delete!(lscene.scene, lscene.scene[end])
+    # end
+    empty!(lscene.scene.plots)
     cbar = filter(x -> typeof(x) == Colorbar, fig_content)[1]
     delete!(cbar)
     # GC.gc(true)
