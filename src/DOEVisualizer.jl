@@ -84,38 +84,39 @@ end
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     n = nrow(test_nums)
-    colors_used = Array{RGBf0, 1}(undef, n)
     scal_xyz = Array{Point3f0, 1}(undef, n)
+    pos_xyz = Array{Point3f0, 1}(undef, n)
+    text_xyz = Array{String, 1}(undef, n)
+    sampled_colors = Array{RGBf0, 1}(undef, n)
 
     for i in 1:n
-        col = colors[resp[i, 1]]
-        colors_used[i] = col
-
         scal_xyz[i] = Point3f0( scal_x[i], scal_y[i], scal_z[i] )
-
-        text!(
-            lscene,
-            "#$(test_nums[i, 1])\n$(resp[i, 1])",
-            position = Point3f0(
-                scal_x[i] + .25 / scal_plot_unit,
-                scal_y[i] + .2 / scal_plot_unit,
-                scal_z[i] + .2 / scal_plot_unit
-            ),
-            textsize = scal_plot_unit / 25.,
-            color = :black,
-            rotation = 3.15,
-            overdraw = true,
+        pos_xyz[i] = Point3f0(
+            scal_x[i] + .25 / scal_plot_unit,
+            scal_y[i] + .2 / scal_plot_unit,
+            scal_z[i] + .2 / scal_plot_unit
         )
+        text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i, 1])"
+        sampled_colors[i] = colors[resp[i, 1]]
     end
 
-    scatter!(
+    splot = scatter!(
         lscene,
         scal_x, scal_y, scal_z,
         markersize = scal_plot_unit * 35., marker = :circle,
-        color = colors_used, # Give properly sampled colours
+        color = sampled_colors,
     )
-    splot = lscene.scene[end]
     splot[1].val = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
+
+    annotations!(
+        lscene,
+        text_xyz,
+        pos_xyz,
+        textsize = scal_plot_unit / 25.,
+        color = :black,
+        rotation = 3.15,
+        overdraw = true,
+    )
 end
 
 
