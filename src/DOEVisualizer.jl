@@ -27,6 +27,7 @@ function find_csv(dir)
             return "$dir/$file"
         end
     end
+    ""
 end
 
 
@@ -38,7 +39,7 @@ function read_data(filename)
     # num_lvls = num_vars * num_resps
     # num_rows = nrow(df) - 1 # Exclude row indicating if it is a variable or response column
     # idx_miss = [i for (i, t) in enumerate(types) if t == ""] # Missing type column indices
-    # select!(df, Not(idx_miss)) # TODO: better way of knowing test number column
+    # select!(df, Not(idx_miss)) # TODO: better way of knowing test number column (should always be first column?)
     df[1, 1] = 0 # Change Missing test number to 0
     types = df[1, :]
     idx_vars = [i for (i, t) in enumerate(types) if t == "variable"] # Variables column indices
@@ -54,17 +55,6 @@ function read_data(filename)
     resps = select(df, idx_resps)
 
     df, titles[2:end], vars, resps, length(idx_vars), length(idx_resps)#, num_rows
-end
-
-
-function get_xyzn(df)
-    n = size(df)[1] # Number of rows (data points)
-    # TODO: better way to select variables
-    x = select(df, 1, copycols=false)[!, 1]
-    y = select(df, 2, copycols=false)[!, 1]
-    z = select(df, 3, copycols=false)[!, 1]
-
-    x, y, z, n
 end
 
 
@@ -91,7 +81,6 @@ function get_ranges(x, y, z)
 end
 
 
-# TODO: Find way to make relative size
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     n = nrow(test_nums)
@@ -187,9 +176,12 @@ function create_colorbar(fig, parent, vals, title, cm)
 end
 
 
-function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure())
+function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm; fig = Figure())
     df_no_test_num = select(df, Not(1))
-    x, y, z, n = get_xyzn(df_no_test_num)
+    x = select(vars, 1, copycols = false)[!, 1]
+    y = select(vars, 2, copycols = false)[!, 1]
+    z = select(vars, 3, copycols = false)[!, 1]
+    n = nrow(vars)
     lvls = trunc(Int, sqrt(n))
 
     range_x, range_y, range_z,
@@ -206,12 +198,10 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     yticklabels = string.(range(ext_y..., length = lvls))
     zticklabels = string.(range(ext_z..., length = lvls))
 
-    # colors = to_colormap(:RdYlGn_3, n) # Get N colors from colormap to represent response variable TODO: allow choosing colormap?
-    colors = to_colormap(:RdYlGn_3, round(Int, range_resp * 100, RoundUp)) # To increase precision to 2 decimals
+    # TODO: better way?
+    colors = to_colormap(cm, round(Int, range_resp * 100, RoundUp)) # To increase precision to 2 decimals
 
-    # TODO: better way of knowing variable vs response columns
-    titles_vars = view(titles, 1:num_vars)
-    titles_resp = view(titles, num_vars+1:num_vars+num_resps)
+    # TODO: better way?
     uniq_var_vals = sort.([ df_no_test_num[.!nonunique(select(df_no_test_num, title_var)), title_var] for title_var in titles_vars ]) # All unique values per variable
     n_uniq_var_vals = length(uniq_var_vals)
     # Scaled to value/interval
@@ -233,7 +223,7 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     axis = lscene.scene[OldAxis]
     axis[:showaxis] = true
 
-    create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors) # TODO: better way of knowing test_nums column
+    create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
@@ -243,12 +233,12 @@ function create_plots(lscene, df, titles, title, titles_var, num_vars, num_resps
     # axis[:frame, :axiscolor] = :black
     axis[:ticks, :textcolor] = :black
 
-    create_titles(lscene, axis, titles_var)
+    create_titles(lscene, axis, titles_vars)
 
     fig, lscene
 end
 
-create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = Figure()) = create_plots(
+create_plots(df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm; fig = Figure()) = create_plots(
     LScene(
         fig[pos_fig...],
         title = title,
@@ -256,7 +246,7 @@ create_plots(df, titles, title, titles_var, num_vars, num_resps, pos_fig; fig = 
             camera = cam3d!,
             raw = false,
         ),
-    ), df, titles, title, titles_var, num_vars, num_resps, pos_fig, fig = fig)
+    ), df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm, fig = fig)
 
 
 function loading_bar()
@@ -296,7 +286,6 @@ function create_save_button(fig, parent, lscene, filename)
 end
 
 
-# TODO: Load? Reload?
 function create_reload_button(fig, parent, lscene, filename, pos_fig, cm)
     button = Button(
         parent,
@@ -310,15 +299,15 @@ function create_reload_button(fig, parent, lscene, filename, pos_fig, cm)
         titles_resps = names(resps)
         menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
         delete!(menus)
-        create_menus(fig, fig[1, 3:4], lscene, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
-        reload_plot(fig, lscene, df, titles, titles_resps[1], titles_vars, num_vars, num_resps, pos_fig, cm)
+        create_menus(fig, fig[1, 3:4], lscene, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
+        reload_plot(fig, lscene, df, vars, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
     end
 
     button
 end
 
 
-function create_menus(fig, parent, lscene, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
+function create_menus(fig, parent, lscene, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
     # menu_vars = Menu(
     #     parent,
     #     options = titles[1:3],
@@ -336,7 +325,7 @@ function create_menus(fig, parent, lscene, df, titles, titles_vars, titles_resps
 
     on(menu_resp.selection) do s
         println("Select response -> $s.")
-        reload_plot(fig, lscene, df, titles, s, titles_vars, num_vars, num_resps, pos_fig, cm)
+        reload_plot(fig, lscene, df, vars, titles, s, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
     end
 
     # parent = grid!(hvcat(2, menu_vars, menu_resp))#, tellheight = false, tellwidth = false)
@@ -346,8 +335,9 @@ function create_menus(fig, parent, lscene, df, titles, titles_vars, titles_resps
 end
 
 
+# TODO: Should display or leave that to caller?
 # Find way to re-render properly (+ memory management)
-function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, cm)
+function reload_plot(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
     lbar = loading_bar()
 
     parent = fig[ pos_fig[1], max(pos_fig[2]...) + 1 ]
@@ -362,10 +352,10 @@ function reload_plot(fig, lscene, df, titles, title, titles_vars, num_vars, num_
     cbar = filter(x -> typeof(x) == Colorbar, fig_content)[1]
     delete!(cbar)
     # GC.gc(true)
-    # delete!(filter(x -> typeof(x) == LScene, fig_content)[1]) # TODO: Reverse create_plots LScene change and just remake it instead?
+    # delete!(filter(x -> typeof(x) == LScene, fig_content)[1]) # TODO: Remake LScene instead of modify?
 
     lscene.title.val = title
-    new_fig, new_lscene = create_plots(lscene, df, titles, title, titles_vars, num_vars, num_resps, pos_fig, fig = fig)
+    new_fig, new_lscene = create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm, fig = fig)
     create_colorbar(fig, parent, select(df, title), title, cm)
     display(new_fig)
 end
@@ -380,12 +370,12 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
     cm = :RdYlGn_3
 
     @info "Creating main plot..."
-    main_fig, main_ls = create_plots(df, titles, default_resp_title, titles_vars, num_vars, num_resps, pos_fig) # TODO: Generate which response plot by default?
+    main_fig, main_ls = create_plots(df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
     @info "Creating other widgets..."
     cbar = create_colorbar(main_fig, main_fig[ pos_fig[1], max(pos_fig[2]...) + 1 ], default_resp, default_resp_title, cm)
 
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
-    menus = create_menus(main_fig, main_fig[1, 3:4], main_ls, df, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
+    menus = create_menus(main_fig, main_fig[1, 3:4], main_ls, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
     reload_button = create_reload_button(main_fig, main_fig[1, 2], main_ls, filename_data, pos_fig, cm)
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
@@ -396,12 +386,26 @@ end
 
 
 function __init__()
-    filename_data = isempty(args[1]) ? find_csv("$(@__DIR__)/../res") : args[1]
-    filename_save = args[2]
+    filename_db, filename_data, filename_save = args
+
+    if isempty(filename_db)
+        exit("No database file found. Exiting...")
+    elseif isempty(filename_data)
+        filename_data = find_csv("$(@__DIR__)/../res")
+    end
+
+    if isempty(filename_data)
+        db = DOEVDBManager.setup(filename_db, "HEAT_TREATMENT_DATA_2")
+        query = """
+            SELECT *
+            FROM $tablename;
+        """
+        df = get_data(db, query)
+    else
+        df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
+        db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
+    end
     
-    df, titles, vars, resps, num_vars, num_resps = read_data(filename_data) # TODO: better way to get filename/path
-    
-    # df_test = DOEVDBManager.test("../db.db", "HEAT_TREATMENT_DATA_2")
     # display(df_test)
 
     @info "Setting up interface and plots..."
@@ -413,6 +417,7 @@ end
 
 
 args = (
+    "../db.db",
     "",
     "taguchi.png",
 )

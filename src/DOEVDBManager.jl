@@ -5,26 +5,17 @@ using DataFrames
 
 export get_data, put_data
 
-function get_data(db, query)
-    DBInterface.execute(db, query) |> DataFrame
-end
+get_data(db, query) = DBInterface.execute(db, query) |> DataFrame
 
-function put_data(db, df, tablename)
-    df |> SQLite.load!(db, tablename)
-end
+put_data(db, df, tablename) = df |> SQLite.load!(db, tablename)
 
-function test(dbpath, tablename, df)
-    db = SQLite.DB(dbpath)
+
+setup(dbpath, tablename) = SQLite.DB(dbpath)
+
+function setup(dbpath, tablename, df)
+    db = setup(dbpath, tablename)
     put_data(db, df, tablename)
-end
-
-function test(dbpath, tablename)
-    db = SQLite.DB(dbpath)
-    query = """
-        SELECT *
-        FROM $tablename;
-    """
-    df = get_data(db, query)
+    db
 end
 
 end
