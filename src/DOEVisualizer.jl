@@ -7,7 +7,7 @@ module DOEVisualizer
 using Unicode
 using Statistics
 using CSV, DataFrames
-using GLMakie
+using GLMakie, AbstractPlotting
 # using GLM, StatsModels
 
 include("DOEVDBManager.jl")
@@ -87,9 +87,8 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     colors_used = Array{RGBf0, 1}(undef, n)
     scal_xyz = Array{Point3f0, 1}(undef, n)
 
-    resp_min = min(resp[!, 1]...)
     for i in 1:n
-        col = colors[floor(Int, (resp[i, 1] - resp_min)) * 100 + 1] # To get properly scaled colour
+        col = colors[resp[i, 1]]
         colors_used[i] = col
 
         scal_xyz[i] = Point3f0( scal_x[i], scal_y[i], scal_z[i] )
@@ -183,11 +182,12 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
     z = select(vars, 3, copycols = false)[!, 1]
     n = nrow(vars)
     lvls = trunc(Int, sqrt(n))
+    resp = select(df, title)[!, 1]
 
     range_x, range_y, range_z,
         ext_x, ext_y, ext_z,
         scal_ext_x, scal_ext_y, scal_ext_z = get_ranges(x, y, z)
-    range_resp = calc_range(select(df, title)[!, 1])
+    range_resp = calc_range(resp)
 
     # Scale data to data/interval so that the plot is unit/equal sized
     xtickrange = range(scal_ext_x..., length = lvls)
@@ -198,8 +198,7 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
     yticklabels = string.(range(ext_y..., length = lvls))
     zticklabels = string.(range(ext_z..., length = lvls))
 
-    # TODO: better way?
-    colors = to_colormap(cm, round(Int, range_resp * 100, RoundUp)) # To increase precision to 2 decimals
+    colors = AbstractPlotting.ColorSampler(to_colormap(cm), extrema(resp))
 
     # TODO: better way?
     uniq_var_vals = sort.([ df_no_test_num[.!nonunique(select(df_no_test_num, title_var)), title_var] for title_var in titles_vars ]) # All unique values per variable
