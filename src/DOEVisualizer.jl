@@ -75,9 +75,9 @@ function get_ranges(x, y, z)
     scal_ext_y = ext_y ./ range_y
     scal_ext_z = ext_z ./ range_z
 
-    range_x, range_y, range_z,
-        ext_x, ext_y, ext_z,
-        scal_ext_x, scal_ext_y, scal_ext_z
+    (range_x, range_y, range_z,
+     ext_x, ext_y, ext_z,
+     scal_ext_x, scal_ext_y, scal_ext_z,)
 end
 
 
@@ -96,8 +96,8 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
             scal_y[i] + .2 / scal_plot_unit,
             scal_z[i] + .2 / scal_plot_unit
         )
-        text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i, 1])"
-        sampled_colors[i] = colors[resp[i, 1]]
+        text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i])"
+        sampled_colors[i] = colors[resp[i]]
     end
 
     splot = scatter!(
@@ -177,7 +177,6 @@ end
 
 
 function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm; fig = Figure())
-    df_no_test_num = select(df, Not(1))
     x = select(vars, 1, copycols = false)[!, 1]
     y = select(vars, 2, copycols = false)[!, 1]
     z = select(vars, 3, copycols = false)[!, 1]
@@ -190,7 +189,8 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
         scal_ext_x, scal_ext_y, scal_ext_z = get_ranges(x, y, z)
     range_resp = calc_range(resp)
 
-    # Scale data to data/interval so that the plot is unit/equal sized
+    # The data is unit-scaled down/normalized so that the plot looks isometric-ish/cubic
+
     xtickrange = range(scal_ext_x..., length = lvls)
     ytickrange = range(scal_ext_y..., length = lvls)
     ztickrange = range(scal_ext_z..., length = lvls)
@@ -201,8 +201,7 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
 
     colors = AbstractPlotting.ColorSampler(to_colormap(cm), extrema(resp))
 
-    # TODO: better way?
-    uniq_var_vals = sort.([ df_no_test_num[.!nonunique(select(df_no_test_num, title_var)), title_var] for title_var in titles_vars ]) # All unique values per variable
+    uniq_var_vals = [ sort(df[.!nonunique(df, title_var), title_var]) for title_var in titles_vars ] # All unique values per variable
     n_uniq_var_vals = length(uniq_var_vals)
     # Scaled to value/interval
     scal_uniq_var_vals = uniq_var_vals[:, :]
@@ -210,21 +209,22 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
     scal_uniq_var_vals[2] /= range_y
     scal_uniq_var_vals[3] /= range_z
 
-    # Plot point one-by-one individually so we can map colormap to response value
+    # Sort to correctly map colors to points in create_points_coords() and for general convenience
     sort!(df, title)
 
     scal_x = x / range_x
     scal_y = y / range_y
     scal_z = z / range_z
-    scal_plot_unit = mean(mean.((scal_x, scal_y, scal_z)))
+    scal_plot_unit = mean((mean(scal_x), mean(scal_y), mean(scal_z)))
 
     create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
 
     axis = lscene.scene[OldAxis]
-    axis[:showaxis] = true
+    axis[:showaxis] = true # This should be after initial plot/scene/axis creation but before others that might assume an existing axis
 
-    create_points_coords(lscene, select(df, 1), select(df, title), x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
+    # Correct tick labels so that they show the original values instead of the scaled down ones
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
     zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
@@ -315,7 +315,7 @@ function create_menus(fig, parent, lscene, df, vars, titles, titles_vars, titles
     #     halign = :left,
     #     width = 5,
     # )
-        
+
     menu_resp = Menu(
         parent,
         options = titles_resps,
@@ -405,7 +405,7 @@ function __init__()
         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
         db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
     end
-    
+
     # display(df_test)
 
     @info "Setting up interface and plots..."
