@@ -409,12 +409,14 @@ function __init__()
     end
 
     if isempty(filename_data)
-        db = DOEVDBManager.setup(filename_db, "HEAT_TREATMENT_DATA_2")
-        query = """
-            SELECT *
-            FROM $tablename;
-        """
-        df = get_data(db, query)
+        # db = DOEVDBManager.setup(filename_db, "HEAT_TREATMENT_DATA_2")
+        # query = """
+        #     SELECT *
+        #     FROM $tablename;
+        # """
+        # df = get_data(db, query)
+        @error "NOT IMPLEMENTED YET: Get data from DB when no CSV file"
+        exit(1)
     else
         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
         db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
