@@ -4,8 +4,7 @@ module DOEVisualizer
 
 # using PackageCompiler
 
-using Unicode
-using Statistics
+using Unicode, Dates, Statistics
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
 # using GLM, StatsModels
@@ -364,13 +363,14 @@ function reload_plot(fig, lscene, df, vars, titles, title, titles_vars, titles_r
 end
 
 
-function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
+function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     pos_fig = (2, 1:3)
     titles_vars = names(vars)
     titles_resps = names(resps)
     default_resp = select(resps, 1)
     default_resp_title = names(default_resp)[1]
     cm = :RdYlGn_3
+    filename_save = string("$(@__DIR__)/../", replace("$(now()) $default_resp_title $(join(titles_vars, '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
 
     @info "Creating main plot..."
     main_fig, main_ls = create_plots(df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
@@ -400,7 +400,7 @@ end
 
 
 function __init__()
-    filename_db, filename_data, filename_save = args
+    filename_db, filename_data = args
 
     if isempty(filename_db)
         exit("No database file found. Exiting...")
@@ -423,7 +423,7 @@ function __init__()
     # display(df_test)
 
     @info "Setting up interface and plots..."
-    setup(df, titles, vars, resps, num_vars, num_resps, filename_data, filename_save)
+    setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
 
     # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
     # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
@@ -433,7 +433,6 @@ end
 args = (
     "$(@__DIR__)/../db.db",
     raw"",
-    raw"taguchi.png",
 )
 # args = readline()
 
