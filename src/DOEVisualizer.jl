@@ -280,9 +280,9 @@ function create_save_button(fig, parent, lscene, filename)
     on(button.clicks) do n
         println("$(button.label[]) -> $filename.")
         lscene.scene.center = false
-        save(filename, lscene.scene)
+        AbstractPlotting.save(filename, lscene.scene)
         lscene.scene.center = true
-        glfw_window = GLMakie.to_native(display(fig))
+        display(fig) # TODO: display() should not be called in callback?
     end
 
     button
@@ -383,6 +383,17 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
     trim!(main_fig.layout)
+
+    set_window_config!(
+        # renderloop = renderloop,
+        # vsync = false,
+        # framerate = 30.0,
+        # float = false,
+        # pause_rendering = false,
+        focus_on_show = true,
+        # decorated = true,
+        title = "Makie DOEVisualizer"
+    )
 
     display(main_fig)
 end
