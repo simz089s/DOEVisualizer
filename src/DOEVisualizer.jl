@@ -431,9 +431,9 @@ end
 
 
 args = (
-    "../db.db",
-    "",
-    "taguchi.png",
+    "$(@__DIR__)/../db.db",
+    raw"",
+    raw"taguchi.png",
 )
 # args = readline()
 
