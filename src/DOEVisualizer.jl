@@ -392,7 +392,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, file
         # pause_rendering = false,
         focus_on_show = true,
         # decorated = true,
-        title = "Makie DOEVisualizer"
+        title = "DoE Visualizer"
     )
 
     display(main_fig)
