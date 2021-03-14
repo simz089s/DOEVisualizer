@@ -235,6 +235,9 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
 
     create_titles(lscene, axis, titles_vars)
 
+    # scale!(lscene.scene, 1/range_x, 1/range_y, 1/range_z)
+    # axis[:scale] = [1/range_x, 1/range_y, 1/range_z]
+
     fig, lscene
 end
 
@@ -279,7 +282,7 @@ function create_save_button(fig, parent, lscene, filename)
         lscene.scene.center = false
         save(filename, lscene.scene)
         lscene.scene.center = true
-        display(fig)
+        glfw_window = GLMakie.to_native(display(fig))
     end
 
     button
