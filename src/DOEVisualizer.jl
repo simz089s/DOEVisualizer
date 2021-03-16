@@ -83,17 +83,18 @@ end
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     n = nrow(test_nums)
-    scal_xyz = Array{Point3f0, 1}(undef, n)
-    pos_xyz = Array{Point3f0, 1}(undef, n)
+    scal_xyz = Array{Point3, 1}(undef, n)
+    pos_xyz = Array{Point3, 1}(undef, n)
     text_xyz = Array{String, 1}(undef, n)
     sampled_colors = Array{RGBf0, 1}(undef, n)
 
+    scal_plot_unit_recip = inv(scal_plot_unit)
     for i in 1:n
-        scal_xyz[i] = Point3f0( scal_x[i], scal_y[i], scal_z[i] )
-        pos_xyz[i] = Point3f0(
-            scal_x[i] + .25 / scal_plot_unit,
-            scal_y[i] + .2 / scal_plot_unit,
-            scal_z[i] + .2 / scal_plot_unit
+        scal_xyz[i] = Point3( scal_x[i], scal_y[i], scal_z[i] )
+        pos_xyz[i] = Point3(
+            scal_x[i] + .25 * scal_plot_unit_recip,
+            scal_y[i] + .2 * scal_plot_unit_recip,
+            scal_z[i] + .15 * scal_plot_unit_recip
         )
         text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i])"
         sampled_colors[i] = colors[resp[i]]
@@ -107,13 +108,14 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     )
     splot[1].val = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
 
+    θ = π/8#.5 * sqrt(2)#exp(π/2 * unit_text / 10) # Right versor?
     annotations!(
         lscene,
         text_xyz,
         pos_xyz,
-        textsize = scal_plot_unit / 25.,
+        textsize = scal_plot_unit * .04,
         color = :black,
-        rotation = 3.15,
+        rotation = Quaternion(0, sin(θ), cos(θ), 0),#Vec3.([1., 1., 1., 1., 1., 1., 1., 1., 1.], 0., 0.),#Quaternion(0., 0., 1., 0.),#3.15,
         overdraw = true,
     )
 end
@@ -142,8 +144,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
                     # linestyle = :dash,
                     # linewidth = 2.,
                     # transparency = true,
-                    # color = RGBAf0(0., 0., 0., .4),
-                    color = :black,
+                    color = :black,# RGBAf0(0., 0., 0., .4),
                     markercolor = :white,
                     markersize = scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
                 )
@@ -259,7 +260,7 @@ function loading_bar()
 #     text!(
 #         ax,
 #         "LOADING...",
-#         position = Point2f0(0., 0.),
+#         position = Point2(0., 0.),
 #         textsize = .5,
 #         color = :black,
 #         overdraw = true,
