@@ -8,7 +8,7 @@ module DOEVisualizer
 using Unicode, Dates, Statistics
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
-# using GLM, StatsModels
+using GLM#, StatsModels, MultivariateStats
 
 include("DOEVDBManager.jl")
 # using DOEVDBManager
@@ -127,7 +127,6 @@ end
 # TODO: probably use some permutation function to make it more elegant and a set instead of array mod1 indices
 function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
     line_data = Array{Array{Float64, 1}, 1}(undef, 3)
-    # invar_data = Dict{Float64, Array{Float64, 1}}()
 
     # scal_uniq_var_vals index of the dimension that will draw the line
     for var_dim_idx = 1 : 3
@@ -143,18 +142,13 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
 
             # Plot function takes in order x,y,z
             line_data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
-            # line_data[invar_data_dim_idx1] = get!(invar_data, invar_val1, fill(invar_val1, 3))
-            # line_data[invar_data_dim_idx2] = get!(invar_data, invar_val2, fill(invar_val2, 3))
             line_data[invar_data_dim_idx1] = fill(invar_val1, 3)
             line_data[invar_data_dim_idx2] = fill(invar_val2, 3)
 
             scatterlines!(
                 lscene,
                 line_data[1], line_data[2], line_data[3],
-                # linestyle = :dash,
-                # linewidth = 2.,
-                # transparency = true,
-                color = :black,#RGBAf0(0., 0., 0., .4),
+                color = :black,
                 markercolor = :white,
                 markersize = scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
             )
@@ -226,12 +220,12 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
     scal_z = z / range_z
     scal_plot_unit = mean((mean(scal_x), mean(scal_y), mean(scal_z)))
 
-    @time create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
+    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
 
     axis = lscene.scene[OldAxis]
     axis[:showaxis] = true # This should be after initial plot/scene/axis creation but before others that might assume an existing axis
 
-    @time create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
     # Correct tick labels so that they show the original values instead of the scaled down ones
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
@@ -418,6 +412,7 @@ function __init__()
         filename_data = find_csv("$(@__DIR__)/../res")
     end
 
+    # TODO: Implement
     if isempty(filename_data)
         # db = DOEVDBManager.setup(filename_db, "HEAT_TREATMENT_DATA_2")
         # query = """
@@ -429,7 +424,7 @@ function __init__()
         exit(1)
     else
         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
-        db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
+        # db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
     end
 
     # display(df_test)
