@@ -3,6 +3,7 @@ module DOEVisualizer
 @info "Loading libraries..."
 
 # using PackageCompiler
+# using BenchmarkTools
 
 using Unicode, Dates, Statistics
 using CSV, DataFrames
@@ -84,19 +85,15 @@ end
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
     n = nrow(test_nums)
     scal_xyz = Array{Point3, 1}(undef, n)
-    pos_xyz = Array{Point3, 1}(undef, n)
     text_xyz = Array{String, 1}(undef, n)
+    pos_xyz = Array{Point3, 1}(undef, n)
     sampled_colors = Array{RGBf0, 1}(undef, n)
 
     scal_plot_unit_recip = inv(scal_plot_unit)
     for i in 1:n
         scal_xyz[i] = Point3( scal_x[i], scal_y[i], scal_z[i] )
-        pos_xyz[i] = Point3(
-            scal_x[i] + .25 * scal_plot_unit_recip,
-            scal_y[i] + .2 * scal_plot_unit_recip,
-            scal_z[i] + .15 * scal_plot_unit_recip
-        )
         text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i])"
+        pos_xyz[i] = Point3( scal_x[i], scal_y[i], scal_z[i] + .03 * scal_plot_unit )
         sampled_colors[i] = colors[resp[i]]
     end
 
@@ -108,47 +105,59 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     )
     splot[1].val = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
 
-    θ = π/8#.5 * sqrt(2)#exp(π/2 * unit_text / 10) # Right versor?
+    # # 135° rotation = -√2/2 + √2/2im
+    # θ = π * .125 # .25 * .5 = π/4 / 2
     annotations!(
         lscene,
         text_xyz,
         pos_xyz,
-        textsize = scal_plot_unit * .04,
+        textsize = scal_plot_unit * 10.,
         color = :black,
-        rotation = Quaternion(0, sin(θ), cos(θ), 0),#Vec3.([1., 1., 1., 1., 1., 1., 1., 1., 1.], 0., 0.),#Quaternion(0., 0., 1., 0.),#3.15,
+        # rotation = Quaternion(0., sin(θ), cos(θ), 0.),
+        align = (:center, :bottom),
+        justification = :center,
+        space = :screen,
         overdraw = true,
+        visible = true,
     )
 end
 
 
 # Draw grid
-# TODO: probably use some permutation function to make it more elegant
+# TODO: probably use some permutation function to make it more elegant and a set instead of array mod1 indices
 function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
-    for var_dim_idx in 1:num_vars # scal_uniq_var_vals index of the dimension that will draw the line
+    line_data = Array{Array{Float64, 1}, 1}(undef, 3)
+    # invar_data = Dict{Float64, Array{Float64, 1}}()
+
+    # scal_uniq_var_vals index of the dimension that will draw the line
+    for var_dim_idx = 1 : 3
         # scal_uniq_var_vals index of the other invariant dimensions
         invar_data_dim_idx1 = mod1(var_dim_idx + 1, 3)
         invar_data_dim_idx2 = mod1(var_dim_idx + 2, 3)
-        for line_idx in 1:n_uniq_var_vals
-            for line_idx2 in 1:n_uniq_var_vals
-                invar_data_dim1 = fill(scal_uniq_var_vals[invar_data_dim_idx1][line_idx], n_uniq_var_vals)
-                invar_data_dim2 = fill(scal_uniq_var_vals[invar_data_dim_idx2][line_idx2], n_uniq_var_vals)
 
-                # Plot function takes in order x,y,z
-                line_data = Array{Array{Float64, 1}, 1}(undef, 3)
-                line_data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
-                line_data[invar_data_dim_idx1] = invar_data_dim1
-                line_data[invar_data_dim_idx2] = invar_data_dim2
-                scatterlines!(
-                    lscene,
-                    line_data[1], line_data[2], line_data[3],
-                    # linestyle = :dash,
-                    # linewidth = 2.,
-                    # transparency = true,
-                    color = :black,# RGBAf0(0., 0., 0., .4),
-                    markercolor = :white,
-                    markersize = scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
-                )
-            end
+        # for line_idx1 = 1 : 3, line_idx2 = 1 : 3
+        for idx = 1 : 9
+            line_idx1, line_idx2 = fldmod1(idx, 3)
+            invar_val1 = scal_uniq_var_vals[invar_data_dim_idx1][line_idx1]
+            invar_val2 = scal_uniq_var_vals[invar_data_dim_idx2][line_idx2]
+
+            # Plot function takes in order x,y,z
+            line_data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
+            # line_data[invar_data_dim_idx1] = get!(invar_data, invar_val1, fill(invar_val1, 3))
+            # line_data[invar_data_dim_idx2] = get!(invar_data, invar_val2, fill(invar_val2, 3))
+            line_data[invar_data_dim_idx1] = fill(invar_val1, 3)
+            line_data[invar_data_dim_idx2] = fill(invar_val2, 3)
+
+            scatterlines!(
+                lscene,
+                line_data[1], line_data[2], line_data[3],
+                # linestyle = :dash,
+                # linewidth = 2.,
+                # transparency = true,
+                color = :black,#RGBAf0(0., 0., 0., .4),
+                markercolor = :white,
+                markersize = scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
+            )
         end
     end
 end
@@ -217,12 +226,12 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
     scal_z = z / range_z
     scal_plot_unit = mean((mean(scal_x), mean(scal_y), mean(scal_z)))
 
-    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
+    @time create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
 
     axis = lscene.scene[OldAxis]
     axis[:showaxis] = true # This should be after initial plot/scene/axis creation but before others that might assume an existing axis
 
-    create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    @time create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
     # Correct tick labels so that they show the original values instead of the scaled down ones
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
