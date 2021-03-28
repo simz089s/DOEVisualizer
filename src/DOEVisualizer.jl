@@ -107,7 +107,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
 
     # # 135° rotation = -√2/2 + √2/2im
     # θ = π * .125 # .25 * .5 = π/4 / 2
-    annotations!(
+    txtplot = annotations!(
         lscene,
         text_xyz,
         pos_xyz,
@@ -120,6 +120,8 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         overdraw = true,
         visible = true,
     )
+
+    splot, txtplot
 end
 
 
@@ -179,7 +181,7 @@ function create_colorbar(fig, parent, vals, title, cm)
 end
 
 
-function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm; fig = Figure())
+function create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, cm)
     x = select(vars, 1, copycols = false)[!, 1]
     y = select(vars, 2, copycols = false)[!, 1]
     z = select(vars, 3, copycols = false)[!, 1]
@@ -225,7 +227,7 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
     axis = lscene.scene[OldAxis]
     axis[:showaxis] = true # This should be after initial plot/scene/axis creation but before others that might assume an existing axis
 
-    create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    plot_pts = create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
     # Correct tick labels so that they show the original values instead of the scaled down ones
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
@@ -241,18 +243,8 @@ function create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps
     # scale!(lscene.scene, 1/range_x, 1/range_y, 1/range_z)
     # axis[:scale] = [1/range_x, 1/range_y, 1/range_z]
 
-    fig, lscene
+    plot_pts
 end
-
-create_plots(df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm; fig = Figure()) = create_plots(
-    LScene(
-        fig[pos_fig...],
-        title = title,
-        scenekw = (
-            camera = cam3d!,
-            raw = false,
-        ),
-    ), df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm, fig = fig)
 
 
 function loading_bar()
@@ -361,7 +353,7 @@ function reload_plot(fig, lscene, df, vars, titles, title, titles_vars, titles_r
     # delete!(filter(x -> typeof(x) == LScene, fig_content)[1]) # TODO: Remake LScene instead of modify?
 
     lscene.title.val = title
-    new_fig, new_lscene = create_plots(lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm, fig = fig)
+    new_fig, new_lscene = create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, cm)
     create_colorbar(fig, parent, select(df, title), title, cm)
     display(new_fig)
 end
@@ -377,10 +369,21 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     filename_save = string("$(@__DIR__)/../", replace("$(now()) $default_resp_title $(join(titles_vars, '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
 
     @info "Creating main plot..."
-    main_fig, main_ls = create_plots(df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
+    main_fig = Figure()
+    plot_sublayout = main_fig[pos_fig...] = GridLayout()
+    main_ls = LScene(
+        main_fig[pos_fig...],
+        title = title,
+        scenekw = (
+            camera = cam3d!,
+            raw = false,
+        ),
+    )
+    main_plot = create_plots(main_fig, main_ls, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_sublayout[1, 1] = main_ls
+    cbar = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, default_resp, default_resp_title, cm)
+    
     @info "Creating other widgets..."
-    cbar = create_colorbar(main_fig, main_fig[ pos_fig[1], max(pos_fig[2]...) + 1 ], default_resp, default_resp_title, cm)
-
     save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
     menus = create_menus(main_fig, main_fig[1, 3:4], main_ls, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
     reload_button = create_reload_button(main_fig, main_fig[1, 2], main_ls, filename_data, pos_fig, cm)
@@ -431,9 +434,6 @@ function __init__()
 
     @info "Setting up interface and plots..."
     setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
-
-    # f = @formula(y_yield ~ 1 + x_stime + x_t + x_atime)
-    # model = glm(f, select(df, 1:4), Normal(), IdentityLink())
 end
 
 
