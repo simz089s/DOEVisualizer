@@ -15,6 +15,16 @@ include("DOEVDBManager.jl")
 
 @info "Loading functions..."
 
+# TODO: Use structs to better pass plot information
+# struct orthogonal
+#     fig
+#     sublayouts
+#     lscenes
+#     cbars
+#     pos
+# end
+
+
 function peek(thing)
     println(fieldnames(typeof(thing)))
     println(thing)
@@ -102,6 +112,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         scal_x, scal_y, scal_z,
         markersize = scal_plot_unit * 35., marker = :circle,
         color = sampled_colors,
+        show_axis = true,
     )
     splot[1].val = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
 
@@ -119,6 +130,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         space = :screen,
         overdraw = true,
         visible = true,
+        show_axis = true,
     )
 
     splot, txtplot
@@ -153,6 +165,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal
                 color = :black,
                 markercolor = :white,
                 markersize = scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
+                show_axis = true,
             )
         end
     end
@@ -225,7 +238,7 @@ function create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_
     create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
 
     axis = lscene.scene[OldAxis]
-    axis[:showaxis] = true # This should be after initial plot/scene/axis creation but before others that might assume an existing axis
+    axis[:showaxis] = true # Just in case `show_axis = true` doesn't work/is forgotten...
 
     plot_pts = create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
 
@@ -360,7 +373,7 @@ end
 
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
-    pos_fig = (2, 1:3)
+    pos_fig = (2, 1:4)
     titles_vars = names(vars)
     titles_resps = names(resps)
     default_resp = select(resps, 1)
@@ -370,8 +383,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
 
     @info "Creating main plot..."
     main_fig = Figure()
-    plot_sublayout = main_fig[pos_fig...] = GridLayout()
-    main_ls = LScene(
+    basic_ls(main_fig, pos_fig, title) = LScene(
         main_fig[pos_fig...],
         title = title,
         scenekw = (
@@ -379,14 +391,34 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
             raw = false,
         ),
     )
-    main_plot = create_plots(main_fig, main_ls, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
-    plot_sublayout[1, 1] = main_ls
+    plot_sublayout = main_fig[pos_fig...] = GridLayout()
+
+    lscene1 = basic_ls(main_fig, pos_fig, title)
+    plot1 = create_plots(main_fig, lscene1, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_sublayout[1, 1] = lscene1
     cbar = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, default_resp, default_resp_title, cm)
-    
+
+    lscene2 = basic_ls(main_fig, pos_fig, title)
+    plot2 = create_plots(main_fig, lscene2, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_sublayout[1, 3] = lscene2
+    cbar = plot_sublayout[1, 4] = create_colorbar(main_fig, main_fig, default_resp, default_resp_title, cm)
+
+    lscene_main = basic_ls(main_fig, pos_fig, title)
+    plot_main = create_plots(main_fig, lscene_main, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_sublayout[2, 1] = lscene_main
+    cbar = plot_sublayout[2, 2] = create_colorbar(main_fig, main_fig, default_resp, default_resp_title, cm)
+    cam_main = cameracontrols(lscene_main.scene)
+    # cam_main = cam3d!(lscene_main.scene)
+
+    lscene1.scene.camera = lscene_main.scene.camera
+    lscene1.scene.camera_controls[] = cam_main
+    lscene2.scene.camera = lscene_main.scene.camera
+    lscene2.scene.camera_controls[] = cam_main
+
     @info "Creating other widgets..."
-    save_button = create_save_button(main_fig, main_fig[1, 1], main_ls, filename_save)
-    menus = create_menus(main_fig, main_fig[1, 3:4], main_ls, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
-    reload_button = create_reload_button(main_fig, main_fig[1, 2], main_ls, filename_data, pos_fig, cm)
+    save_button = create_save_button(main_fig, main_fig[1, 1], lscene1, filename_save)
+    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscene1, filename_data, pos_fig, cm)
+    menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
 
     # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
     trim!(main_fig.layout)
