@@ -194,6 +194,33 @@ function create_colorbar(fig, parent, vals, title, cm)
 end
 
 
+function create_table(fig, parent, df)
+    nr = nrow(df)
+    nc = ncol(df)
+    N = nr * nc
+    ax = parent = Axis(
+        parent,
+        title = "Data",
+        yreversed = true,
+    )
+    sort!(df, 1)
+    data = string.(reshape(Matrix{Float64}(df), N))
+    pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
+    txt = text!(
+        ax,
+        data,
+        position = pos,
+    )
+    txtitles = text!(
+        ax,
+        names(df),
+        position = [Point2(i, 0.) for i = 1 : nc],
+    )
+    hidedecorations!(ax)
+    ax
+end
+
+
 function create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, cm)
     x = select(vars, 1, copycols = false)[!, 1]
     y = select(vars, 2, copycols = false)[!, 1]
@@ -279,7 +306,7 @@ function loading_bar()
 end
 
 
-function create_save_button(fig, parent, lscene, filename)
+function create_save_button(fig, parent, filename)
     button = Button(
         parent,
         label = "Save",
@@ -287,9 +314,9 @@ function create_save_button(fig, parent, lscene, filename)
 
     on(button.clicks) do n
         println("$(button.label[]) -> $filename.")
-        lscene.scene.center = false
-        AbstractPlotting.save(filename, lscene.scene)
-        lscene.scene.center = true
+        fig.scene.center = false
+        save(filename, fig.scene)
+        fig.scene.center = true
         display(fig) # TODO: display() should not be called in callback?
     end
 
@@ -297,7 +324,7 @@ function create_save_button(fig, parent, lscene, filename)
 end
 
 
-function create_reload_button(fig, parent, lscene, filename, pos_fig, cm)
+function create_reload_button(fig, parent, lscenes, filename, pos_fig, cm)
     button = Button(
         parent,
         label = "Reload",
@@ -308,67 +335,70 @@ function create_reload_button(fig, parent, lscene, filename, pos_fig, cm)
         df, titles, vars, resps, num_vars, num_resps = read_data(filename)
         titles_vars = names(vars)
         titles_resps = names(resps)
-        menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
-        delete!(menus)
-        create_menus(fig, fig[1, 3:4], lscene, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
-        reload_plot(fig, lscene, df, vars, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
+        # menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
+        # delete!(menus)
+        # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
+        loading_bar()
+        reload_plot(fig, lscenes[1], df, vars, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 1), cm)
+        reload_plot(fig, lscenes[2], df, vars, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 3), cm)
+        reload_plot(fig, lscenes[3], df, vars, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (2, 1), cm)
+        # GC.gc(true)
+        display(fig) # TODO: display() should not be called in callback?
     end
 
     button
 end
 
 
-function create_menus(fig, parent, lscene, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
-    # menu_vars = Menu(
-    #     parent,
-    #     options = titles[1:3],
-    #     prompt = "Select variables...",
-    #     halign = :left,
-    #     width = 5,
-    # )
+# function create_menus(fig, parent, lscene, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
+#     # menu_vars = Menu(
+#     #     parent,
+#     #     options = titles[1:3],
+#     #     prompt = "Select variables...",
+#     #     halign = :left,
+#     #     width = 5,
+#     # )
 
-    menu_resp = Menu(
-        parent,
-        options = titles_resps,
-        prompt = "Select response...",
-        # halign = :right,
-    )
+#     menu_resp = Menu(
+#         parent,
+#         options = titles_resps,
+#         prompt = "Select response...",
+#         # halign = :right,
+#     )
 
-    on(menu_resp.selection) do s
-        println("Select response -> $s.")
-        reload_plot(fig, lscene, df, vars, titles, s, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
-    end
+#     on(menu_resp.selection) do s
+#         println("Select response -> $s.")
+#         reload_plot(fig, lscene, df, vars, titles, s, titles_vars, titles_resps, num_vars, num_resps, pos_fig, (2, 1), cm)
+#     end
 
-    # parent = grid!(hvcat(2, menu_vars, menu_resp))#, tellheight = false, tellwidth = false)
+#     # parent = grid!(hvcat(2, menu_vars, menu_resp))#, tellheight = false, tellwidth = false)
 
-    menu_resp
-    # menu_vars, menu_resp
-end
+#     menu_resp
+#     # menu_vars, menu_resp
+# end
 
 
 # TODO: Should display or leave that to caller?
 # Find way to re-render properly (+ memory management)
-function reload_plot(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
-    lbar = loading_bar()
-
-    parent = fig[ pos_fig[1], max(pos_fig[2]...) + 1 ]
-    # fig_content = parent.fig.content
-    fig_content = fig.content
+function reload_plot(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
+    # lbar = loading_bar()
 
     # Delete previous plot objects
     # for i in 1:length(lscene.scene)
     #     delete!(lscene.scene, lscene.scene[end])
     # end
     empty!(lscene.scene.plots)
-    cbar = filter(x -> typeof(x) == Colorbar, fig_content)[1]
+    cbar = filter(x -> typeof(x) == Colorbar, fig.content)[1]
     delete!(cbar)
     # GC.gc(true)
-    # delete!(filter(x -> typeof(x) == LScene, fig_content)[1]) # TODO: Remake LScene instead of modify?
+    # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # TODO: Remake LScene instead of modify?
 
+    plots_grid = content(fig[pos_fig...])
     lscene.title.val = title
-    new_fig, new_lscene = create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, cm)
-    create_colorbar(fig, parent, select(df, title), title, cm)
-    display(new_fig)
+    plot_new = create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plots_grid[pos_sub...] = lscene
+    plots_grid[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title), title, cm)
+    # display(fig)
 end
 
 
@@ -376,10 +406,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     pos_fig = (2, 1:4)
     titles_vars = names(vars)
     titles_resps = names(resps)
-    default_resp = select(resps, 1)
-    default_resp_title = names(default_resp)[1]
     cm = :RdYlGn_3
-    filename_save = string("$(@__DIR__)/../", replace("$(now()) $default_resp_title $(join(titles_vars, '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
+    filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
 
     @info "Creating main plot..."
     main_fig = Figure()
@@ -394,19 +422,19 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     plot_sublayout = main_fig[pos_fig...] = GridLayout()
 
     lscene1 = basic_ls(main_fig, pos_fig, title)
-    plot1 = create_plots(main_fig, lscene1, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot1 = create_plots(main_fig, lscene1, df, vars, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[1, 1] = lscene1
-    cbar = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, default_resp, default_resp_title, cm)
+    cbar = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
 
     lscene2 = basic_ls(main_fig, pos_fig, title)
-    plot2 = create_plots(main_fig, lscene2, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot2 = create_plots(main_fig, lscene2, df, vars, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[1, 3] = lscene2
-    cbar = plot_sublayout[1, 4] = create_colorbar(main_fig, main_fig, default_resp, default_resp_title, cm)
+    cbar = plot_sublayout[1, 4] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
 
     lscene_main = basic_ls(main_fig, pos_fig, title)
-    plot_main = create_plots(main_fig, lscene_main, df, vars, titles, default_resp_title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_main = create_plots(main_fig, lscene_main, df, vars, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[2, 1] = lscene_main
-    cbar = plot_sublayout[2, 2] = create_colorbar(main_fig, main_fig, default_resp, default_resp_title, cm)
+    cbar = plot_sublayout[2, 2] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
     cam_main = cameracontrols(lscene_main.scene)
     # cam_main = cam3d!(lscene_main.scene)
 
@@ -415,12 +443,16 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     lscene2.scene.camera = lscene_main.scene.camera
     lscene2.scene.camera_controls[] = cam_main
 
-    @info "Creating other widgets..."
-    save_button = create_save_button(main_fig, main_fig[1, 1], lscene1, filename_save)
-    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscene1, filename_data, pos_fig, cm)
-    menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
+    lscenes = [lscene1, lscene2, lscene_main]
 
-    # main_fig[2, 2] = grid!(hvcat(2, toggles, toggles_labels, save_button, save_button), tellheight = false, tellwidth = false)
+    tbl = plot_sublayout[2, 3:4] = create_table(main_fig, main_fig, df)
+
+    @info "Creating other widgets..."
+    save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
+    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, filename_data, pos_fig, cm)
+    # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
+    main_fig[1, :] = grid!(hcat(save_button, reload_button))#, menus))
+
     trim!(main_fig.layout)
 
     set_window_config!(
