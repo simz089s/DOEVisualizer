@@ -204,7 +204,7 @@ function create_table(fig, parent, df)
         position = [Point2(i, 0.) for i = 1 : nc],
     )
     hidedecorations!(ax)
-    ax
+    ax, txt, txtitles
 end
 
 
@@ -307,7 +307,7 @@ function create_save_button(fig, parent, filename)
 end
 
 
-function create_reload_button(fig, parent, lscenes, filename, pos_fig, cm)
+function create_reload_button(fig, parent, lscenes, tbl_txt, tbl_titles, filename, pos_fig, cm)
     button = Button(
         parent,
         label = "Reload",
@@ -325,6 +325,7 @@ function create_reload_button(fig, parent, lscenes, filename, pos_fig, cm)
         reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 1), cm)
         reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 3), cm)
         reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (2, 1), cm)
+        reload_table(fig, df, tbl_txt, tbl_titles)
         # GC.gc(true)
         display(fig) # TODO: display() should not be called in callback?
     end
@@ -376,12 +377,24 @@ function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_re
     # GC.gc(true)
     # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # TODO: Remake LScene instead of modify?
 
-    plots_grid = content(fig[pos_fig...])
+    plots_gridlayout = content(fig[pos_fig...])
     lscene.title.val = title_resp
     plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm)
-    plots_grid[pos_sub...] = lscene
-    plots_grid[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
+    plots_gridlayout[pos_sub...] = lscene
+    plots_gridlayout[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
     # display(fig)
+end
+
+
+function reload_table(fig, df, plot_txt, plot_titles)
+    nr = nrow(df)
+    nc = ncol(df)
+    N = nr * nc
+    sort!(df, 1)
+    data = string.(reshape(Matrix{Float64}(df), N))
+    # pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
+    plot_txt[1].val = data
+    plot_titles[1].val = names(df)
 end
 
 
@@ -428,11 +441,12 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
 
     lscenes = [lscene1, lscene2, lscene_main]
 
-    tbl = plot_sublayout[2, 3:4] = create_table(main_fig, main_fig, df)
+    tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
+    plot_sublayout[2, 3:4] = tbl_ax
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
-    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, filename_data, pos_fig, cm)
+    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_txt, tbl_titles, filename_data, pos_fig, cm)
     # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
     main_fig[1, :] = grid!(hcat(save_button, reload_button))#, menus))
 
