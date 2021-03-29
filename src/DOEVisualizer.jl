@@ -71,23 +71,11 @@ end
 calc_range(a) = abs(-(extrema(a)...)) # Find interval size max-min of a set of values
 
 
-function get_ranges(x, y, z)
-    range_x = calc_range(x)
-    range_y = calc_range(y)
-    range_z = calc_range(z)
-
-    ext_x = extrema(x)
-    ext_y = extrema(y)
-    ext_z = extrema(z)
-
+function get_range_scales(a)
+    scal = calc_range(a)
+    ext = extrema(a)
     # Scale data to data/interval so that the plot is unit/equal sized
-    scal_ext_x = ext_x ./ range_x
-    scal_ext_y = ext_y ./ range_y
-    scal_ext_z = ext_z ./ range_z
-
-    (range_x, range_y, range_z,
-     ext_x, ext_y, ext_z,
-     scal_ext_x, scal_ext_y, scal_ext_z,)
+    scal, ext, ext ./ scal
 end
 
 
@@ -99,8 +87,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     pos_xyz = Array{Point3, 1}(undef, n)
     sampled_colors = Array{RGBf0, 1}(undef, n)
 
-    scal_plot_unit_recip = inv(scal_plot_unit)
-    for i in 1:n
+    for i = 1 : n
         scal_xyz[i] = Point3( scal_x[i], scal_y[i], scal_z[i] )
         text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i])"
         pos_xyz[i] = Point3( scal_x[i], scal_y[i], scal_z[i] + .03 * scal_plot_unit )
@@ -139,7 +126,7 @@ end
 
 # Draw grid
 # TODO: probably use some permutation function to make it more elegant and a set instead of array mod1 indices
-function create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
+function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
     line_data = Array{Array{Float64, 1}, 1}(undef, 3)
 
     # scal_uniq_var_vals index of the dimension that will draw the line
@@ -221,48 +208,44 @@ function create_table(fig, parent, df)
 end
 
 
-function create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, cm)
-    x = select(vars, 1, copycols = false)[!, 1]
-    y = select(vars, 2, copycols = false)[!, 1]
-    z = select(vars, 3, copycols = false)[!, 1]
-    n = nrow(vars)
-    lvls = trunc(Int, sqrt(n))
-    resp = select(df, title)[!, 1]
-
-    range_x, range_y, range_z,
-        ext_x, ext_y, ext_z,
-        scal_ext_x, scal_ext_y, scal_ext_z = get_ranges(x, y, z)
-    range_resp = calc_range(resp)
-
-    # The data is unit-scaled down/normalized so that the plot looks isometric-ish/cubic
-
-    xtickrange = range(scal_ext_x..., length = lvls)
-    ytickrange = range(scal_ext_y..., length = lvls)
-    ztickrange = range(scal_ext_z..., length = lvls)
-    # The tick labels should still represent the original range of values
-    xticklabels = string.(range(ext_x..., length = lvls))
-    yticklabels = string.(range(ext_y..., length = lvls))
-    zticklabels = string.(range(ext_z..., length = lvls))
-
-    colors = AbstractPlotting.ColorSampler(to_colormap(cm), extrema(resp))
-
-    uniq_var_vals = [ sort(df[.!nonunique(df, title_var), title_var]) for title_var in titles_vars ] # All unique values per variable
-    n_uniq_var_vals = length(uniq_var_vals)
-    # Scaled to value/interval
-    scal_uniq_var_vals = uniq_var_vals[:, :]
-    scal_uniq_var_vals[1] /= range_x
-    scal_uniq_var_vals[2] /= range_y
-    scal_uniq_var_vals[3] /= range_z
+function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm)
+    resp = df[!, title_resp]
 
     # Sort to correctly map colors to points in create_points_coords() and for general convenience
-    sort!(df, title)
+    sort!(df, title_resp)
+
+    x = df[!, titles_vars[1]]
+    y = df[!, titles_vars[2]]
+    z = df[!, titles_vars[3]]
+    
+    # The data is unit-scaled down/normalized so that the plot looks isometric-ish/cubic
+
+    range_x, ext_x, scal_ext_x = get_range_scales(x)
+    range_y, ext_y, scal_ext_y = get_range_scales(y)
+    range_z, ext_z, scal_ext_z = get_range_scales(z)
 
     scal_x = x / range_x
     scal_y = y / range_y
     scal_z = z / range_z
     scal_plot_unit = mean((mean(scal_x), mean(scal_y), mean(scal_z)))
 
-    create_grid(lscene, scal_uniq_var_vals, num_vars, n_uniq_var_vals, scal_plot_unit)
+    xtickrange = range(scal_ext_x..., length = 3)
+    ytickrange = range(scal_ext_y..., length = 3)
+    ztickrange = range(scal_ext_z..., length = 3)
+    # The tick labels should still represent the original range of values
+    xticklabels = string.(range(ext_x..., length = 3))
+    yticklabels = string.(range(ext_y..., length = 3))
+    zticklabels = string.(range(ext_z..., length = 3))
+
+    uniq_var_vals = [ sort(df[.!nonunique(df, title_var), title_var]) for title_var in titles_vars ] # All unique values per variable
+    # Scaled to value/interval
+    scal_uniq_var_vals = [uniq_var_vals[1] / range_x,
+                          uniq_var_vals[2] / range_y,
+                          uniq_var_vals[3] / range_z]
+
+    colors = AbstractPlotting.ColorSampler(to_colormap(cm), extrema(resp))
+
+    create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
 
     axis = lscene.scene[OldAxis]
     axis[:showaxis] = true # Just in case `show_axis = true` doesn't work/is forgotten...
@@ -339,9 +322,9 @@ function create_reload_button(fig, parent, lscenes, filename, pos_fig, cm)
         # delete!(menus)
         # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
         loading_bar()
-        reload_plot(fig, lscenes[1], df, vars, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 1), cm)
-        reload_plot(fig, lscenes[2], df, vars, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 3), cm)
-        reload_plot(fig, lscenes[3], df, vars, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (2, 1), cm)
+        reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 1), cm)
+        reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 3), cm)
+        reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (2, 1), cm)
         # GC.gc(true)
         display(fig) # TODO: display() should not be called in callback?
     end
@@ -380,7 +363,7 @@ end
 
 # TODO: Should display or leave that to caller?
 # Find way to re-render properly (+ memory management)
-function reload_plot(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
+function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
     # lbar = loading_bar()
 
     # Delete previous plot objects
@@ -394,10 +377,10 @@ function reload_plot(fig, lscene, df, vars, titles, title, titles_vars, titles_r
     # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # TODO: Remake LScene instead of modify?
 
     plots_grid = content(fig[pos_fig...])
-    lscene.title.val = title
-    plot_new = create_plots(fig, lscene, df, vars, titles, title, titles_vars, titles_resps, num_vars, num_resps, cm)
+    lscene.title.val = title_resp
+    plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm)
     plots_grid[pos_sub...] = lscene
-    plots_grid[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title), title, cm)
+    plots_grid[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
     # display(fig)
 end
 
@@ -422,17 +405,17 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     plot_sublayout = main_fig[pos_fig...] = GridLayout()
 
     lscene1 = basic_ls(main_fig, pos_fig, title)
-    plot1 = create_plots(main_fig, lscene1, df, vars, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[1, 1] = lscene1
     cbar = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
 
     lscene2 = basic_ls(main_fig, pos_fig, title)
-    plot2 = create_plots(main_fig, lscene2, df, vars, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[1, 3] = lscene2
     cbar = plot_sublayout[1, 4] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
 
     lscene_main = basic_ls(main_fig, pos_fig, title)
-    plot_main = create_plots(main_fig, lscene_main, df, vars, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_main = create_plots(main_fig, lscene_main, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[2, 1] = lscene_main
     cbar = plot_sublayout[2, 2] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
     cam_main = cameracontrols(lscene_main.scene)
