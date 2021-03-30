@@ -270,6 +270,48 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 end
 
 
+function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm)
+    f = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
+    model = glm(f, df, Normal(), IdentityLink())
+    # ŷ = predict(model)
+    ctbl = coeftable(model)
+    Zs = sort!(deleteat!(ctbl.rownms .=> ctbl.cols[3], 1), by = x -> abs(getfield(x, :second)))
+    colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low variance:medium variance:high variance
+    var_colors = Dict(first.(Zs) .=> colors)
+    ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = title_resp)
+    xs = 1 : 3
+    plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
+    for (i, var_title) ∈ enumerate(titles_vars)
+        df = sort(df, [var_title, title_resp])
+        ys = df[!, title_resp]
+        mids = ys[2:3:end]
+        lows = mids - ys[1:3:end]
+        highs = ys[3:3:end] - mids
+        col = var_colors[var_title]
+        sc = plots[i] = scatterlines!(
+            ax,
+            xs .+ .05 * i, mids,
+            color = col,
+            markercolor = col,
+        )
+        eb = errorbars!(
+            ax,
+            xs .+ .05 * i, mids, lows, highs,
+            color = col,
+        )
+    end
+    leg = parent[pos_sub[1] + 1, pos_sub[2]] = Legend(
+        fig,
+        plots,
+        titles_vars,
+        orientation = :horizontal,
+        tellwidth = false,
+    )
+    rowsize!(parent, pos_sub[1] + 1, Relative(.05))
+    ax
+end
+
+
 function loading_bar()
     fig = Figure()
 #     ax = Axis(
@@ -443,6 +485,11 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
 
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
     plot_sublayout[2, 3:4] = tbl_ax
+
+    regress_sublayout = main_fig[pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
+    regr1 = regress_sublayout[1, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (1, 1), cm)
+    regr1 = regress_sublayout[3, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (3, 1), cm)
+    regr1 = regress_sublayout[5, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (5, 1), cm)
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
