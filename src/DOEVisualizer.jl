@@ -278,8 +278,8 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
     Zs = sort!(deleteat!(ctbl.rownms .=> ctbl.cols[3], 1), by = x -> abs(getfield(x, :second)))
     colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low variance:medium variance:high variance
     var_colors = Dict(first.(Zs) .=> colors)
-    ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = title_resp)
     xs = 1 : 3
+    ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = title_resp, xticks = xs,)
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
     for (i, var_title) ∈ enumerate(titles_vars)
         df = sort(df, [var_title, title_resp])
