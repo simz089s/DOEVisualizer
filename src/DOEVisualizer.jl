@@ -274,6 +274,39 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 end
 
 
+function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
+    scal, ext, _ = get_range_scales(resp_df)
+
+    slider = parent[pos_sub...] = IntervalSlider(
+        fig,
+        range = ext[1] - scal : .1 : ext[2] + scal,
+        startvalues = ext,
+    )
+
+    slider_lab = parent[pos_sub[1] + 1, pos_sub[2]] = Label(
+        fig,
+        @lift(string(round.($(slider.interval), digits = 2))),
+        tellwidth = false,
+    )
+
+    on(slider.interval) do interval
+        println("Select interval for  -> $interval.")
+        ordered_resp = map(x -> parse(Float64, x[4:end]), resp_plot[2].input_args[1].val)
+        ext = extrema(ordered_resp)
+        lims = (min(slider.interval.val[1], ext[1]), max(slider.interval.val[2], ext[2]))
+
+        cm = cbar.colormap.val
+        resp_plot[1].colormap = cm
+        col_samp = AbstractPlotting.ColorSampler(to_colormap(cm), lims)
+        resp_plot[1].color = [col_samp[resp] for resp in ordered_resp]
+
+        cbar.limits = lims
+    end
+
+    slider, slider_lab
+end
+
+
 # TODO: use regression instead of middle value?
 function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm)
     f = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
@@ -286,6 +319,7 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
     xs = 1 : 3
     ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = title_resp, xticks = xs,)
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
+
     for (i, var_title) ∈ enumerate(titles_vars)
         df = sort(df, [var_title, title_resp])
         ys = df[!, title_resp]
@@ -293,18 +327,21 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
         lows = mids - ys[1:3:end]
         highs = ys[3:3:end] - mids
         col = var_colors[var_title]
+
         sc = plots[i] = scatterlines!(
             ax,
             xs .+ .05 * i, mids,
             color = col,
             markercolor = col,
         )
+
         eb = errorbars!(
             ax,
             xs .+ .05 * i, mids, lows, highs,
             color = col,
         )
     end
+
     leg = parent[pos_sub[1] + 1, pos_sub[2]] = Legend(
         fig,
         plots,
@@ -312,7 +349,9 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
         orientation = :horizontal,
         tellwidth = false,
     )
+
     rowsize!(parent, pos_sub[1] + 1, Relative(.05))
+
     ax
 end
 
@@ -515,17 +554,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
 
     lscenes = [lscene1, lscene2, lscene_main]
 
-    interval_resp1, ext_resp1, _ = get_range_scales(resps[!, 1])
-    cm_slider1 = plot_sublayout[2, 1:2] = IntervalSlider(main_fig, range = ext_resp1[1] - interval_resp1 : .1 : ext_resp1[2] + interval_resp1, startvalues = ext_resp1)
-    cm_slider_lab1 = plot_sublayout[3, 1:2] = Label(main_fig, @lift(string(round.($(cm_slider1.interval), digits = 2))), tellwidth = false)
-
-    interval_resp2, ext_resp2, _ = get_range_scales(resps[!, 2])
-    cm_slider2 = plot_sublayout[2, 3:4] = IntervalSlider(main_fig, range = ext_resp2[1] - interval_resp2 : .1 : ext_resp2[2] + interval_resp2, startvalues = ext_resp2)
-    cm_slider_lab2 = plot_sublayout[3, 3:4] = Label(main_fig, @lift(string(round.($(cm_slider2.interval), digits = 2))), tellwidth = false)
-
-    interval_resp_main, ext_resp_main, _ = get_range_scales(resps[!, 3])
-    cm_slider_main = plot_sublayout[5, 1:2] = IntervalSlider(main_fig, range = ext_resp_main[1] - interval_resp_main : .1 : ext_resp_main[2] + interval_resp_main, startvalues = ext_resp_main)
-    cm_slider_lab_main = plot_sublayout[6, 1:2] = Label(main_fig, @lift(string(round.($(cm_slider_main.interval), digits = 2))), tellwidth = false)
+    cm_slider1, cm_slider_lab1 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 1], plot1, cbar1, (2, 1:2))
+    cm_slider2, cm_slider_lab2 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 2], plot2, cbar2, (2, 3:4))
+    cm_slider_main, cm_slider_lab_main = create_cm_sliders(main_fig, plot_sublayout, resps[!, 3], plot_main, cbar_main, (5, 1:2))
 
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
     plot_sublayout[4:6, 3:4] = tbl_ax
