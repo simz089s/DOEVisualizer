@@ -274,6 +274,7 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 end
 
 
+# TODO: use regression instead of middle value?
 function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm)
     f = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
     model = glm(f, df, Normal(), IdentityLink())
@@ -408,6 +409,33 @@ end
 # end
 
 
+function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cm)
+    menu = Menu(
+        parent,
+        options = [cm, :seaborn_bright, :seaborn_bright6, :seaborn_colorblind, :seaborn_colorblind6, :seaborn_dark, :seaborn_dark6, :seaborn_deep, :seaborn_deep6, :seaborn_icefire_gradient, :seaborn_muted, :seaborn_muted6, :seaborn_pastel, :seaborn_pastel6, :seaborn_rocket_gradient],
+        prompt = "Select color palette...",
+    )
+
+    on(menu.selection) do sel
+        println("Select colormap -> $sel.")
+        for (splot, cbar, slider) in zip(splots, cbars, cm_sliders)
+            ordered_resp = map(x -> parse(Float64, x[4:end]), splot[2].input_args[1].val)
+            ext_resp = extrema(ordered_resp)
+            lims = (min(slider.interval.val[1], ext_resp[1]), max(slider.interval.val[2], ext_resp[2]))
+
+            splot[1].colormap = sel
+            col_samp = AbstractPlotting.ColorSampler(to_colormap(sel), lims)
+            splot[1].color = [col_samp[resp] for resp in ordered_resp]
+
+            cbar.colormap = sel
+            cbar.limits = lims
+        end
+    end
+
+    menu
+end
+
+
 # TODO: Should display or leave that to caller?
 # Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
@@ -445,11 +473,11 @@ end
 
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
-    pos_fig = (2, 1:4)
     titles_vars = names(vars)
     titles_resps = names(resps)
-    cm = :RdYlGn_3
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
+    pos_fig = (2, 1:4)
+    cm = :RdYlGn_3
 
     @info "Creating main plot..."
     main_fig = Figure()
@@ -466,17 +494,17 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     lscene1 = basic_ls(main_fig, pos_fig, title)
     plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[1, 1] = lscene1
-    cbar = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
+    cbar1 = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
 
     lscene2 = basic_ls(main_fig, pos_fig, title)
     plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm)
     plot_sublayout[1, 3] = lscene2
-    cbar = plot_sublayout[1, 4] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
+    cbar2 = plot_sublayout[1, 4] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
 
     lscene_main = basic_ls(main_fig, pos_fig, title)
     plot_main = create_plots(main_fig, lscene_main, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm)
-    plot_sublayout[2, 1] = lscene_main
-    cbar = plot_sublayout[2, 2] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
+    plot_sublayout[4, 1] = lscene_main
+    cbar_main = plot_sublayout[4, 2] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
     cam_main = cameracontrols(lscene_main.scene)
     # cam_main = cam3d!(lscene_main.scene)
 
@@ -487,19 +515,33 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
 
     lscenes = [lscene1, lscene2, lscene_main]
 
+    interval_resp1, ext_resp1, _ = get_range_scales(resps[!, 1])
+    cm_slider1 = plot_sublayout[2, 1:2] = IntervalSlider(main_fig, range = ext_resp1[1] - interval_resp1 : .1 : ext_resp1[2] + interval_resp1, startvalues = ext_resp1)
+    cm_slider_lab1 = plot_sublayout[3, 1:2] = Label(main_fig, @lift(string(round.($(cm_slider1.interval), digits = 2))), tellwidth = false)
+
+    interval_resp2, ext_resp2, _ = get_range_scales(resps[!, 2])
+    cm_slider2 = plot_sublayout[2, 3:4] = IntervalSlider(main_fig, range = ext_resp2[1] - interval_resp2 : .1 : ext_resp2[2] + interval_resp2, startvalues = ext_resp2)
+    cm_slider_lab2 = plot_sublayout[3, 3:4] = Label(main_fig, @lift(string(round.($(cm_slider2.interval), digits = 2))), tellwidth = false)
+
+    interval_resp_main, ext_resp_main, _ = get_range_scales(resps[!, 3])
+    display(ext_resp_main)
+    cm_slider_main = plot_sublayout[5, 1:4] = IntervalSlider(main_fig, range = ext_resp_main[1] - interval_resp_main : .1 : ext_resp_main[2] + interval_resp_main, startvalues = ext_resp_main)
+    cm_slider_lab_main = plot_sublayout[6, 1:4] = Label(main_fig, @lift(string(round.($(cm_slider_main.interval), digits = 2))), tellwidth = false)
+
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
-    plot_sublayout[2, 3:4] = tbl_ax
+    plot_sublayout[4, 3:4] = tbl_ax
 
     regress_sublayout = main_fig[pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     regr1 = regress_sublayout[1, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (1, 1), cm)
-    regr1 = regress_sublayout[3, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (3, 1), cm)
-    regr1 = regress_sublayout[5, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (5, 1), cm)
+    regr2 = regress_sublayout[3, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (3, 1), cm)
+    regr3 = regress_sublayout[5, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (5, 1), cm)
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
     reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_txt, tbl_titles, filename_data, pos_fig, cm)
     # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
-    main_fig[1, :] = grid!(hcat(save_button, reload_button))#, menus))
+    cm_menu = create_cm_menu(main_fig, main_fig[1, 3], [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cm)
+    main_fig[1, :] = grid!(hcat(save_button, reload_button, cm_menu))#, menus))
 
     trim!(main_fig.layout)
 
