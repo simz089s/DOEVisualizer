@@ -6,6 +6,7 @@ module DOEVisualizer
 # using BenchmarkTools
 
 using Unicode, Dates, Statistics
+import JSON: parsefile
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, StatsModels, MultivariateStats
@@ -187,10 +188,10 @@ function create_table(fig, parent, df)
     N = nr * nc
     ax = parent = Axis(
         parent,
-        title = "Data",
+        # title = "Data",
         yreversed = true,
     )
-    sort!(df, 1)
+    sort!(df, 1) # Sort by test number
     data = string.(reshape(Matrix{Float64}(df), N))
     pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
     txt = text!(
@@ -376,10 +377,10 @@ function loading_bar()
 end
 
 
-function create_save_button(fig, parent, filename)
+function create_save_button(fig, parent, filename; but_lab = "Save")
     button = Button(
         parent,
-        label = "Save",
+        label = but_lab,
     )
 
     on(button.clicks) do n
@@ -394,10 +395,10 @@ function create_save_button(fig, parent, filename)
 end
 
 
-function create_reload_button(fig, parent, lscenes, tbl_txt, tbl_titles, filename, pos_fig, cm)
+function create_reload_button(fig, parent, lscenes, tbl_txt, tbl_titles, filename, pos_fig, cm; but_lab = "Reload")
     button = Button(
         parent,
-        label = "Reload",
+        label = but_lab,
     )
 
     on(button.clicks) do n
@@ -449,11 +450,11 @@ end
 # end
 
 
-function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cm)
+function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cm; menu_prompt = "Select color palette...")
     menu = Menu(
         parent,
         options = [cm, :seaborn_bright, :seaborn_bright6, :seaborn_colorblind, :seaborn_colorblind6, :seaborn_dark, :seaborn_dark6, :seaborn_deep, :seaborn_deep6, :seaborn_icefire_gradient, :seaborn_muted, :seaborn_muted6, :seaborn_pastel, :seaborn_pastel6, :seaborn_rocket_gradient],
-        prompt = "Select color palette...",
+        prompt = menu_prompt,
     )
 
     on(menu.selection) do sel
@@ -504,7 +505,7 @@ function reload_table(fig, df, plot_txt, plot_titles)
     nr = nrow(df)
     nc = ncol(df)
     N = nr * nc
-    sort!(df, 1)
+    sort!(df, 1) # Sort by test number
     data = string.(reshape(Matrix{Float64}(df), N))
     # pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
     plot_txt[1].val = data
@@ -512,7 +513,7 @@ function reload_table(fig, df, plot_txt, plot_titles)
 end
 
 
-function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
+function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, intlcl)
     titles_vars = names(vars)
     titles_resps = names(resps)
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
@@ -563,17 +564,14 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     plot_sublayout[4:6, 3:4] = tbl_ax
 
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
-    pos_reg_anchor = (1, 1)
+    pos_reg_cbar = (1, 1)
+    pos_reg_anchor = (3, 1)
     regr1 = regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), cm)
     regr2 = regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), cm)
     regr3 = regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), cm)
-    pos_reg_cbar = pos_reg_anchor[1] + 6, pos_reg_anchor[2]
     cbar_regr = regress_sublayout[pos_reg_cbar...] = Colorbar(
         main_fig,
-        # ticks = LinearTicks(1),
-        label = "Variable Z-score = (x - µ) / σ",
-        # height = Relative(.5),
-        # flipaxis = false,
+        label = intlcl["cbar_regr_lab"],
         limits = (1, 3),
         colormap = cgrad(:RdYlGn_4, 3, categorical = true),
         vertical = false,
@@ -582,14 +580,14 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
         ticklabelsvisible = false,
     )
     rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03))
-    cbar_regr_lab = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in ("Lowest", "Middle", "Highest")])))
+    cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in intlcl["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
 
     @info "Creating other widgets..."
-    save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
-    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_txt, tbl_titles, filename_data, pos_fig, cm)
+    save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = intlcl["save_but_lab"])
+    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_txt, tbl_titles, filename_data, pos_fig, cm; but_lab = intlcl["reload_but_lab"])
     # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
-    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cm)
+    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cm; menu_prompt = intlcl["cm_menu_prompt"])
     button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, reload_button, cm_menu))
 
     trim!(main_fig.layout)
@@ -632,11 +630,12 @@ function __init__()
         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
         # db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
     end
-
     # display(df_test)
 
+    intlcl = parsefile("$(@__DIR__)/../cfg/DOEVconfig.json")
+
     @info "Setting up interface and plots..."
-    setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
+    setup(df, titles, vars, resps, num_vars, num_resps, filename_data, intlcl)
 end
 
 
