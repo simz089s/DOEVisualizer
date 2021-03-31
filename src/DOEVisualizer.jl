@@ -290,7 +290,7 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
     )
 
     on(slider.interval) do interval
-        println("Select interval for  -> $interval.")
+        # println("Select interval for $ -> $interval.")
         ordered_resp = map(x -> parse(Float64, x[4:end]), resp_plot[2].input_args[1].val)
         ext = extrema(ordered_resp)
         lims = (min(slider.interval.val[1], ext[1]), max(slider.interval.val[2], ext[2]))
@@ -317,28 +317,29 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
     colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low variance:medium variance:high variance
     var_colors = Dict(first.(Zs) .=> colors)
     xs = 1 : 3
-    ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = title_resp, xticks = xs,)
+    ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = "Mean average of $title_resp values\nper single variable value", xticks = xs,)
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
 
     for (i, var_title) ∈ enumerate(titles_vars)
         df = sort(df, [var_title, title_resp])
         ys = df[!, title_resp]
         mids = ys[2:3:end]
-        lows = mids - ys[1:3:end]
-        highs = ys[3:3:end] - mids
+        lows = ys[1:3:end]
+        highs = ys[3:3:end]
+        means = mean.(zip(mids, lows, highs))
         col = var_colors[var_title]
-
-        sc = plots[i] = scatterlines!(
-            ax,
-            xs .+ .05 * i, mids,
-            color = col,
-            markercolor = col,
-        )
 
         eb = errorbars!(
             ax,
-            xs .+ .05 * i, mids, lows, highs,
+            xs .+ .05 * i, mids, mids - lows, highs - mids,
+            color = :black,
+        )
+
+        sc = plots[i] = scatterlines!(
+            ax,
+            xs .+ .05 * i, means,
             color = col,
+            markercolor = col,
         )
     end
 
@@ -561,17 +562,35 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
     plot_sublayout[4:6, 3:4] = tbl_ax
 
-    regress_sublayout = main_fig[pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
-    regr1 = regress_sublayout[1, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (1, 1), cm)
-    regr2 = regress_sublayout[3, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (3, 1), cm)
-    regr3 = regress_sublayout[5, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (5, 1), cm)
+    regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
+    pos_reg_anchor = (1, 1)
+    regr1 = regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), cm)
+    regr2 = regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), cm)
+    regr3 = regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), cm)
+    pos_reg_cbar = pos_reg_anchor[1] + 6, pos_reg_anchor[2]
+    cbar_regr = regress_sublayout[pos_reg_cbar...] = Colorbar(
+        main_fig,
+        # ticks = LinearTicks(1),
+        label = "Variable Z-score = (x - µ) / σ",
+        # height = Relative(.5),
+        # flipaxis = false,
+        limits = (1, 3),
+        colormap = cgrad(:RdYlGn_4, 3, categorical = true),
+        vertical = false,
+        labelpadding = 5.,
+        ticksize = 0.,
+        ticklabelsvisible = false,
+    )
+    rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03))
+    cbar_regr_lab = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in ("Lowest", "Middle", "Highest")])))
+    rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save)
     reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_txt, tbl_titles, filename_data, pos_fig, cm)
     # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
-    cm_menu = create_cm_menu(main_fig, main_fig[1, 3], [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cm)
-    main_fig[1, :] = grid!(hcat(save_button, reload_button, cm_menu))#, menus))
+    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cm)
+    button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, reload_button, cm_menu))
 
     trim!(main_fig.layout)
 
