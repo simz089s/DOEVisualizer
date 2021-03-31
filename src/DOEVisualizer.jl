@@ -524,12 +524,11 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data)
     cm_slider_lab2 = plot_sublayout[3, 3:4] = Label(main_fig, @lift(string(round.($(cm_slider2.interval), digits = 2))), tellwidth = false)
 
     interval_resp_main, ext_resp_main, _ = get_range_scales(resps[!, 3])
-    display(ext_resp_main)
-    cm_slider_main = plot_sublayout[5, 1:4] = IntervalSlider(main_fig, range = ext_resp_main[1] - interval_resp_main : .1 : ext_resp_main[2] + interval_resp_main, startvalues = ext_resp_main)
-    cm_slider_lab_main = plot_sublayout[6, 1:4] = Label(main_fig, @lift(string(round.($(cm_slider_main.interval), digits = 2))), tellwidth = false)
+    cm_slider_main = plot_sublayout[5, 1:2] = IntervalSlider(main_fig, range = ext_resp_main[1] - interval_resp_main : .1 : ext_resp_main[2] + interval_resp_main, startvalues = ext_resp_main)
+    cm_slider_lab_main = plot_sublayout[6, 1:2] = Label(main_fig, @lift(string(round.($(cm_slider_main.interval), digits = 2))), tellwidth = false)
 
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
-    plot_sublayout[4, 3:4] = tbl_ax
+    plot_sublayout[4:6, 3:4] = tbl_ax
 
     regress_sublayout = main_fig[pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     regr1 = regress_sublayout[1, 1] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (1, 1), cm)
