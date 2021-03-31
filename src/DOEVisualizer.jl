@@ -197,11 +197,15 @@ function create_table(fig, parent, df)
         ax,
         data,
         position = pos,
+        align = (:center, :center),
+        justification = :center,
     )
     txtitles = text!(
         ax,
         names(df),
         position = [Point2(i, 0.) for i = 1 : nc],
+        align = (:center, :center),
+        justification = :center,
     )
     hidedecorations!(ax)
     ax, txt, txtitles
