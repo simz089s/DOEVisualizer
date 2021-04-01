@@ -11,8 +11,7 @@ using CSV, DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, StatsModels, MultivariateStats
 
-include("FileDialog.jl")
-using FileDialog
+using Gtk
 
 include("DOEVDBManager.jl")
 # using DOEVDBManager
@@ -614,12 +613,11 @@ end
 
 
 function __init__()
-    @show uigetfile(; folder = @__DIR__)
     filename_config, _ = args
     PREFIX = "$(@__DIR__)/../"
     CONFIG = parsefile(filename_config)
     filename_db = PREFIX * CONFIG["db_path"]
-    filename_data = raw""#PREFIX * CONFIG["data_path"]
+    filename_data = open_dialog("Open CSV data file...")#PREFIX * CONFIG["data_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
     cm = CONFIG["default_colormap"]
 
