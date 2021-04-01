@@ -611,7 +611,13 @@ end
 
 
 function __init__()
-    filename_db, filename_data, filename_locale, cm = args
+    filename_config, _ = args
+    PREFIX = "$(@__DIR__)/../"
+    CONFIG = parsefile(filename_config)
+    filename_db = PREFIX * CONFIG["db_path"]
+    filename_data = raw""#PREFIX * CONFIG["data_path"]
+    filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
+    cm = CONFIG["default_colormap"]
 
     if isempty(filename_db)
         exit("No database file found. Exiting...")
@@ -643,11 +649,8 @@ end
 
 
 args = (
-    "$(@__DIR__)/../db.db",
+    "$(@__DIR__)/../cfg/config.json",
     raw"",
-    "$(@__DIR__)/../cfg/locale_EN.json",
-    :RdYlGn_3,
 )
-# args = readline()
 
 end

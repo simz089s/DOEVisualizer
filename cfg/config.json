@@ -1,0 +1,8 @@
+{
+    "db_path" : "db.db",
+    "data_path" : "",
+    "locale_path" :"cfg/locale_",
+    "locale" : "EN",
+    "default_colormap" : "RdYlGn_3",
+    "guard_page" : ""
+}
