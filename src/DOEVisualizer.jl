@@ -11,6 +11,9 @@ using CSV, DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, StatsModels, MultivariateStats
 
+include("FileDialog.jl")
+using FileDialog
+
 include("DOEVDBManager.jl")
 # using DOEVDBManager
 
@@ -611,6 +614,7 @@ end
 
 
 function __init__()
+    @show uigetfile(; folder = @__DIR__)
     filename_config, _ = args
     PREFIX = "$(@__DIR__)/../"
     CONFIG = parsefile(filename_config)
