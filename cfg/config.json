@@ -3,6 +3,6 @@
     "data_path" : "",
     "locale_path" :"cfg/locale_",
     "locale" : "EN",
-    "default_colormap" : "RdYlGn_3",
+    "default_colormap" : "cividis",
     "guard_page" : ""
 }

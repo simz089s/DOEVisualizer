@@ -597,9 +597,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in LOCALE_TR["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
 
-    cms = [cm, :RdYlGn_3, :viridis, :rainbow, :seaborn_colorblind, :seaborn_colorblind6,
-            :seaborn_icefire_gradient, :seaborn_rocket_gradient, :gnuplot, :gnuplot2, :Greens_9,
-            :balance, :tokyo, :twilight, :Spectral_9, :watermelon]
+    cms = [cm, :RdYlGn_3, :RdYlGn_4, :RdYlGn_5, :RdYlGn_6, :RdYlGn_7, :RdYlGn_8, :RdYlGn_9, :RdYlGn_10, :RdYlGn_11]
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
