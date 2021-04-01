@@ -184,15 +184,17 @@ function create_colorbar(fig, parent, vals, title, cm)
 end
 
 
-function create_table(fig, parent, df)
+function create_table(fig, parent, df, ax = nothing)
     nr = nrow(df)
     nc = ncol(df)
     N = nr * nc
-    ax = parent = Axis(
-        parent,
-        # title = "Data",
-        yreversed = true,
-    )
+    if isnothing(ax)
+        ax = parent = Axis(
+            parent,
+            # title = "Data",
+            yreversed = true,
+        )
+    end
     sort!(df, 1) # Sort by test number
     data = string.(reshape(Matrix{Float64}(df), N))
     pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
@@ -202,6 +204,8 @@ function create_table(fig, parent, df)
         position = pos,
         align = (:center, :center),
         justification = :center,
+        # textsize = 1,
+        space = :screen,
     )
     txtitles = text!(
         ax,
@@ -209,6 +213,8 @@ function create_table(fig, parent, df)
         position = [Point2(i, 0.) for i = 1 : nc],
         align = (:center, :center),
         justification = :center,
+        # textsize = 1,
+        space = :screen,
     )
     hidedecorations!(ax)
     ax, txt, txtitles
@@ -310,8 +316,7 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
 end
 
 
-# TODO: use regression instead of middle value?
-function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm)
+function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm, ax = nothing)
     f = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
     model = glm(f, df, Normal(), IdentityLink())
     # ŷ = predict(model)
@@ -320,7 +325,9 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
     colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low variance:medium variance:high variance
     var_colors = Dict(first.(Zs) .=> colors)
     xs = 1 : 3
-    ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = "Mean average of $title_resp values\nper single variable value", xticks = xs,)
+    if isnothing(ax)
+        ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = "Mean average of $title_resp values\nper single variable value", xticks = xs,)
+    end
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
 
     for (i, var_title) ∈ enumerate(titles_vars)
@@ -397,25 +404,29 @@ function create_save_button(fig, parent, filename; but_lab = "Save")
 end
 
 
-function create_reload_button(fig, parent, lscenes, tbl_txt, tbl_titles, filename, pos_fig, cm; but_lab = "Reload")
+function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_layout, pos_fig, pos_subs, pos_regr, cm; but_lab = "Reload", window_title = "Open CSV data file...")
     button = Button(
         parent,
         label = but_lab,
     )
 
     on(button.clicks) do n
-        println("$(button.label[]) -> $filename.")
-        df, titles, vars, resps, num_vars, num_resps = read_data(filename)
+        filename_data = open_dialog_native(window_title)
+        println("$(button.label[]) -> $filename_data.")
+        df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
         titles_vars = names(vars)
         titles_resps = names(resps)
         # menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
         # delete!(menus)
         # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
         loading_bar()
-        reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 1), cm)
-        reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (1, 3), cm)
-        reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, (2, 1), cm)
-        reload_table(fig, df, tbl_txt, tbl_titles)
+        reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[1], cm)
+        reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[2], cm)
+        reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[3], cm)
+        reload_table(fig, df, tbl_ax)
+        reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[1], (pos_regr[1] + 0, pos_regr[2]), cm, regr_axs[1])
+        reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[2], (pos_regr[1] + 2, pos_regr[2]), cm, regr_axs[2])
+        reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[3], (pos_regr[1] + 4, pos_regr[2]), cm, regr_axs[3])
         # GC.gc(true)
         display(fig) # TODO: display() should not be called in callback?
     end
@@ -503,19 +514,20 @@ function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_re
 end
 
 
-function reload_table(fig, df, plot_txt, plot_titles)
-    nr = nrow(df)
-    nc = ncol(df)
-    N = nr * nc
-    sort!(df, 1) # Sort by test number
-    data = string.(reshape(Matrix{Float64}(df), N))
-    # pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
-    plot_txt[1].val = data
-    plot_titles[1].val = names(df)
+function reload_table(fig, df, ax)
+    empty!(ax)
+    create_table(fig, fig, df, ax)
 end
 
 
-function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, intlcl)
+function reload_regr(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, cm, ax)
+    ax.title = "Mean average of $title_resp values\nper single variable value"
+    empty!(ax)
+    create_plot_regression(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, cm, ax)
+end
+
+
+function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, CONFIG, LOCALE_TR)
     titles_vars = names(vars)
     titles_resps = names(resps)
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
@@ -532,21 +544,22 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
         ),
     )
     plot_sublayout = main_fig[pos_fig...] = GridLayout()
+    pos_plots = [(1, 1), (1, 3), (4, 1)]
 
     lscene1 = basic_ls(main_fig, pos_fig, title)
     plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm)
-    plot_sublayout[1, 1] = lscene1
-    cbar1 = plot_sublayout[1, 2] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
+    plot_sublayout[pos_plots[1]...] = lscene1
+    cbar1 = plot_sublayout[pos_plots[1][1], pos_plots[1][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
 
     lscene2 = basic_ls(main_fig, pos_fig, title)
     plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm)
-    plot_sublayout[1, 3] = lscene2
-    cbar2 = plot_sublayout[1, 4] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
+    plot_sublayout[pos_plots[2]...] = lscene2
+    cbar2 = plot_sublayout[pos_plots[2][1], pos_plots[2][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
 
     lscene_main = basic_ls(main_fig, pos_fig, title)
     plot_main = create_plots(main_fig, lscene_main, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm)
-    plot_sublayout[4, 1] = lscene_main
-    cbar_main = plot_sublayout[4, 2] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
+    plot_sublayout[pos_plots[3]...] = lscene_main
+    cbar_main = plot_sublayout[pos_plots[3][1], pos_plots[3][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
     cam_main = cameracontrols(lscene_main.scene)
     # cam_main = cam3d!(lscene_main.scene)
 
@@ -572,7 +585,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     regr3 = regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), cm)
     cbar_regr = regress_sublayout[pos_reg_cbar...] = Colorbar(
         main_fig,
-        label = intlcl["cbar_regr_lab"],
+        label = LOCALE_TR["cbar_regr_lab"],
         limits = (1, 3),
         colormap = cgrad(:RdYlGn_4, 3, categorical = true),
         vertical = false,
@@ -581,7 +594,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
         ticklabelsvisible = false,
     )
     rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03))
-    cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in intlcl["cbar_regr_labs"]])))
+    cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in LOCALE_TR["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
 
     cms = [cm, :RdYlGn_3, :viridis, :rainbow, :seaborn_colorblind, :seaborn_colorblind6,
@@ -589,10 +602,10 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
             :balance, :tokyo, :twilight, :Spectral_9, :watermelon]
 
     @info "Creating other widgets..."
-    save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = intlcl["save_but_lab"])
-    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_txt, tbl_titles, filename_data, pos_fig, cm; but_lab = intlcl["reload_but_lab"])
+    save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
+    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_ax, [regr1, regr2, regr3], regress_sublayout, pos_fig, pos_plots, pos_reg_anchor, cm; but_lab = LOCALE_TR["reload_but_lab"], window_title = LOCALE_TR["file_dialog_window_title"])
     # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
-    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cms; menu_prompt = intlcl["cm_menu_prompt"])
+    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cms; menu_prompt = LOCALE_TR["cm_menu_prompt"])
     button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, reload_button, cm_menu))
 
     trim!(main_fig.layout)
@@ -617,9 +630,12 @@ function __init__()
     PREFIX = "$(@__DIR__)/../"
     CONFIG = parsefile(filename_config)
     filename_db = PREFIX * CONFIG["db_path"]
-    filename_data = open_dialog("Open CSV data file...")#PREFIX * CONFIG["data_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
     cm = CONFIG["default_colormap"]
+
+    LOCALE_TR = parsefile(filename_locale)
+
+    filename_data = open_dialog_native(LOCALE_TR["file_dialog_window_title"])#PREFIX * CONFIG["data_path"]
 
     if isempty(filename_db)
         exit("No database file found. Exiting...")
@@ -640,13 +656,12 @@ function __init__()
     else
         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
         # db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
+        println("Loaded $filename_data")
     end
     # display(df_test)
 
-    intlcl = parsefile(filename_locale)
-
     @info "Setting up interface and plots..."
-    setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, intlcl)
+    setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, CONFIG, LOCALE_TR)
 end
 
 

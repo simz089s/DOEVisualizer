@@ -1,4 +1,5 @@
 {
+    "file_dialog_window_title" : "打开CSV数据文件",
     "save_but_lab" : "保存",
     "reload_but_lab" : "重新",
     "cm_menu_prompt" : "请选择调色板",

@@ -1,4 +1,5 @@
 {
+    "file_dialog_window_title" : "Open CSV data file...",
     "save_but_lab" : "Save",
     "reload_but_lab" : "Reload",
     "cm_menu_prompt" : "Select colormap palette...",
