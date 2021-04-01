@@ -450,10 +450,10 @@ end
 # end
 
 
-function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cm; menu_prompt = "Select color palette...")
+function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt = "Select color palette...")
     menu = Menu(
         parent,
-        options = [cm, :seaborn_bright, :seaborn_bright6, :seaborn_colorblind, :seaborn_colorblind6, :seaborn_dark, :seaborn_dark6, :seaborn_deep, :seaborn_deep6, :seaborn_icefire_gradient, :seaborn_muted, :seaborn_muted6, :seaborn_pastel, :seaborn_pastel6, :seaborn_rocket_gradient],
+        options = cms,
         prompt = menu_prompt,
     )
 
@@ -513,12 +513,11 @@ function reload_table(fig, df, plot_txt, plot_titles)
 end
 
 
-function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, intlcl)
+function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, intlcl)
     titles_vars = names(vars)
     titles_resps = names(resps)
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
     pos_fig = (2, 1:4)
-    cm = :RdYlGn_3
 
     @info "Creating main plot..."
     main_fig = Figure()
@@ -583,11 +582,15 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, intl
     cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in intlcl["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
 
+    cms = [cm, :RdYlGn_3, :viridis, :rainbow, :seaborn_colorblind, :seaborn_colorblind6,
+            :seaborn_icefire_gradient, :seaborn_rocket_gradient, :gnuplot, :gnuplot2, :Greens_9,
+            :balance, :tokyo, :twilight, :Spectral_9, :watermelon]
+
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = intlcl["save_but_lab"])
     reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_txt, tbl_titles, filename_data, pos_fig, cm; but_lab = intlcl["reload_but_lab"])
     # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
-    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cm; menu_prompt = intlcl["cm_menu_prompt"])
+    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cms; menu_prompt = intlcl["cm_menu_prompt"])
     button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, reload_button, cm_menu))
 
     trim!(main_fig.layout)
@@ -608,7 +611,7 @@ end
 
 
 function __init__()
-    filename_db, filename_data = args
+    filename_db, filename_data, filename_locale, cm = args
 
     if isempty(filename_db)
         exit("No database file found. Exiting...")
@@ -632,16 +635,18 @@ function __init__()
     end
     # display(df_test)
 
-    intlcl = parsefile("$(@__DIR__)/../cfg/DOEVconfig.json")
+    intlcl = parsefile(filename_locale)
 
     @info "Setting up interface and plots..."
-    setup(df, titles, vars, resps, num_vars, num_resps, filename_data, intlcl)
+    setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, intlcl)
 end
 
 
 args = (
     "$(@__DIR__)/../db.db",
     raw"",
+    "$(@__DIR__)/../cfg/locale_EN.json",
+    :RdYlGn_3,
 )
 # args = readline()
 
