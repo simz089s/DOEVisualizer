@@ -466,7 +466,7 @@ end
 function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt = "Select color palette...")
     menu = Menu(
         parent,
-        options = cms,
+        options = vcat("Reverse current", cms),
         prompt = menu_prompt,
     )
 
@@ -476,6 +476,7 @@ function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt
             ordered_resp = map(x -> parse(Float64, x[4:end]), splot[2].input_args[1].val)
             ext_resp = extrema(ordered_resp)
             lims = (min(slider.interval.val[1], ext_resp[1]), max(slider.interval.val[2], ext_resp[2]))
+            if sel == "Reverse current" sel = Reverse(cbar.colormap[]) end
 
             splot[1].colormap = sel
             col_samp = AbstractPlotting.ColorSampler(to_colormap(sel), lims)
@@ -532,6 +533,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     titles_resps = names(resps)
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
     pos_fig = (2, 1:4)
+    cms = [cm, :RdYlGn_4, :RdYlGn_6, :RdYlGn_8, :RdYlGn_10, :redgreensplit, :diverging_gwr_55_95_c38_n256, :watermelon,]
 
     @info "Creating main plot..."
     main_fig = Figure()
@@ -574,9 +576,11 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     cm_slider2, cm_slider_lab2 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 2], plot2, cbar2, (2, 3:4))
     cm_slider_main, cm_slider_lab_main = create_cm_sliders(main_fig, plot_sublayout, resps[!, 3], plot_main, cbar_main, (5, 1:2))
 
+    @info "Creating data table..."
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
     plot_sublayout[4:6, 3:4] = tbl_ax
 
+    @info "Creating comparison plots..."
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     pos_reg_cbar = (1, 1)
     pos_reg_anchor = (3, 1)
@@ -596,8 +600,6 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03))
     cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in LOCALE_TR["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
-
-    cms = [cm, :RdYlGn_3, :RdYlGn_4, :RdYlGn_5, :RdYlGn_6, :RdYlGn_7, :RdYlGn_8, :RdYlGn_9, :RdYlGn_10, :RdYlGn_11]
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
