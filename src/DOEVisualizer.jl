@@ -34,7 +34,7 @@ function peek(thing)
 end
 
 
-function find_csv(dir)
+function find_csv(dir)::String
     for file in readdir(dir)
         if Unicode.normalize(last(file, 4), casefold = true) == ".csv" # Find first file that ends with .csv (case insensitive)
             return "$dir/$file"
@@ -45,7 +45,7 @@ end
 
 
 function read_data(filename)
-    df = CSV.File(filename) |> DataFrame
+    df = DataFrame(CSV.File(filename))
 
     # First row after title should be indicating if the column is a variable or response (except for test number column)
     types = map(t -> ismissing(t) ? "" : t, df[1, :])
@@ -628,14 +628,14 @@ end
 function __init__()
     filename_config, _ = args
     PREFIX = "$(@__DIR__)/../"
-    CONFIG = parsefile(filename_config)
+    CONFIG::Dict{String, String} = parsefile(filename_config, dicttype = Dict{String, String})
     filename_db = PREFIX * CONFIG["db_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
-    cm = CONFIG["default_colormap"]
+    cm::String = CONFIG["default_colormap"]
 
-    LOCALE_TR = parsefile(filename_locale)
+    LOCALE_TR::Dict{String, Union{String, Array{Any, 1}}} = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
 
-    filename_data = open_dialog_native(LOCALE_TR["file_dialog_window_title"])#PREFIX * CONFIG["data_path"]
+    filename_data::String = open_dialog_native(LOCALE_TR["file_dialog_window_title"])#PREFIX * CONFIG["data_path"]
 
     if isempty(filename_db)
         exit("No database file found. Exiting...")
@@ -665,7 +665,7 @@ function __init__()
 end
 
 
-args = (
+const args = (
     "$(@__DIR__)/../cfg/config.json",
     raw"",
 )
