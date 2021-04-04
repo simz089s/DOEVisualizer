@@ -100,7 +100,8 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     splot = scatter!(
         lscene,
         scal_x, scal_y, scal_z,
-        markersize = scal_plot_unit * 35., marker = :circle,
+        marker = :circle,
+        markersize = 80,#scal_plot_unit * 35.,
         color = sampled_colors,
         show_axis = true,
     )
@@ -112,7 +113,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         lscene,
         text_xyz,
         pos_xyz,
-        textsize = scal_plot_unit * 10.,
+        # textsize = scal_plot_unit * 10.,
         color = :black,
         # rotation = Quaternion(0., sin(θ), cos(θ), 0.),
         align = (:center, :bottom),
@@ -154,7 +155,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
                 line_data[1], line_data[2], line_data[3],
                 color = :black,
                 markercolor = :white,
-                markersize = scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
+                markersize = 75,#scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
                 show_axis = true,
             )
         end
@@ -413,6 +414,7 @@ function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_
     on(button.clicks) do n
         filename_data = open_dialog_native(window_title)
         println("$(button.label[]) -> $filename_data.")
+        if isempty(filename_data) return end
         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
         titles_vars = names(vars)
         titles_resps = names(resps)
