@@ -1,5 +1,6 @@
 module DOEVisualizer
 
+
 @info "Loading libraries..."
 
 # using PackageCompiler
@@ -15,6 +16,7 @@ using Gtk
 
 include("DOEVDBManager.jl")
 # using DOEVDBManager
+
 
 @info "Loading functions..."
 
@@ -91,9 +93,9 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     sampled_colors = Array{RGBf0, 1}(undef, n)
 
     for i = 1 : n
-        scal_xyz[i] = Point3( scal_x[i], scal_y[i], scal_z[i] )
+        scal_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i])
         text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i])"
-        pos_xyz[i] = Point3( scal_x[i], scal_y[i], scal_z[i] + .03 * scal_plot_unit )
+        pos_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i] + .03 * scal_plot_unit)
         sampled_colors[i] = colors[resp[i]]
     end
 
@@ -107,15 +109,13 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     )
     splot[1].val = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
 
-    # # 135° rotation = -√2/2 + √2/2im
-    # θ = π * .125 # .25 * .5 = π/4 / 2
     txtplot = annotations!(
         lscene,
         text_xyz,
         pos_xyz,
         # textsize = scal_plot_unit * 10.,
         color = :black,
-        # rotation = Quaternion(0., sin(θ), cos(θ), 0.),
+        rotations = Billboard(),
         align = (:center, :bottom),
         justification = :center,
         space = :screen,
@@ -129,7 +129,6 @@ end
 
 
 # Draw grid
-# TODO: probably use some permutation function to make it more elegant and a set instead of array mod1 indices
 function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
     line_data = Array{Array{Float64, 1}, 1}(undef, 3)
 
@@ -300,7 +299,6 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
     )
 
     on(slider.interval) do interval
-        # println("Select interval for $ -> $interval.")
         ordered_resp = map(x -> parse(Float64, x[4:end]), resp_plot[2].input_args[1].val)
         ext = extrema(ordered_resp)
         lims = (min(slider.interval.val[1], ext[1]), max(slider.interval.val[2], ext[2]))
@@ -369,21 +367,9 @@ end
 
 
 function loading_bar()
-    fig = Figure()
-#     ax = Axis(
-#         fig,
-#     )
-#     text!(
-#         ax,
-#         "LOADING...",
-#         position = Point2(0., 0.),
-#         textsize = .5,
-#         color = :black,
-#         overdraw = true,
-#     )
-#     fig
-    display(fig) # Triggers built-in loading bar for some reason ¯\_(¬_¬)_/¯
-    fig
+    # fig = Figure()
+    display(Figure()) # Triggers built-in loading bar for some reason ¯\_(¬_¬)_/¯
+    # fig
 end
 
 
@@ -415,9 +401,11 @@ function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_
         filename_data = open_dialog_native(window_title)
         println("$(button.label[]) -> $filename_data.")
         if isempty(filename_data) return end
+
         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
         titles_vars = names(vars)
         titles_resps = names(resps)
+
         # menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
         # delete!(menus)
         # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
@@ -429,7 +417,7 @@ function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_
         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[1], (pos_regr[1] + 0, pos_regr[2]), cm, regr_axs[1])
         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[2], (pos_regr[1] + 2, pos_regr[2]), cm, regr_axs[2])
         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[3], (pos_regr[1] + 4, pos_regr[2]), cm, regr_axs[3])
-        # GC.gc(true)
+
         display(fig) # TODO: display() should not be called in callback?
     end
 
@@ -493,27 +481,19 @@ function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt
 end
 
 
-# TODO: Should display or leave that to caller?
 # Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
-    # lbar = loading_bar()
-
     # Delete previous plot objects
-    # for i in 1:length(lscene.scene)
-    #     delete!(lscene.scene, lscene.scene[end])
-    # end
     empty!(lscene.scene.plots)
+    # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # Remake LScene instead of modify
     cbar = filter(x -> typeof(x) == Colorbar, fig.content)[1]
     delete!(cbar)
-    # GC.gc(true)
-    # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # TODO: Remake LScene instead of modify?
 
     plots_gridlayout = content(fig[pos_fig...])
     lscene.title.val = title_resp
     plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm)
     plots_gridlayout[pos_sub...] = lscene
     plots_gridlayout[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
-    # display(fig)
 end
 
 
