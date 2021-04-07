@@ -6,11 +6,11 @@ module DOEVisualizer
 # using PackageCompiler
 # using BenchmarkTools
 
-using Unicode, Dates, Statistics
+using Unicode, Dates, Statistics, LinearAlgebra
 import JSON: parsefile
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
-using GLM#, StatsModels, MultivariateStats
+# using Polynomials#, LsqFit#, GLM#, StatsModels#, MultivariateStats#, OnlineStats#, Grassmann
 
 using Gtk
 
@@ -316,16 +316,23 @@ end
 
 
 function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm, ax = nothing)
-    f = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
-    model = glm(f, df, Normal(), IdentityLink())
+    # f = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
+    # model = glm(f, df, Normal(), IdentityLink())
     # ŷ = predict(model)
-    ctbl = coeftable(model)
-    Zs = sort!(deleteat!(ctbl.rownms .=> ctbl.cols[3], 1), by = x -> abs(getfield(x, :second)))
-    colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low variance:medium variance:high variance
-    var_colors = Dict(first.(Zs) .=> colors)
+    # ctbl = coeftable(model)
+    # Zs = sort!(deleteat!(ctbl.rownms .=> ctbl.cols[3], 1), by = x -> abs(getfield(x, :second)))
+    colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low:medium:high variance
+    # var_colors = Dict(first.(Zs) .=> colors)
+    lin_reg(X, y) = (X'X) \ X'y
+    lin_reg_spd(X, y) = begin XtX = X'X; if isposdef!(XtX) XtX \ X'y else lin_reg(X, y) end end
+    # m(x, p) = p[1] * exp.(p[2] * x)
     xs = 1 : 3
     if isnothing(ax)
-        ax = parent[pos_sub[1], pos_sub[2]] = Axis(fig, title = "Mean average of $title_resp values\nper single variable value", xticks = xs,)
+        ax = parent[pos_sub[1], pos_sub[2]] = Axis(
+            fig,
+            title = "Mean average of $title_resp values\nper single variable value",
+            xticks = xs,
+        )
     end
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
 
@@ -336,6 +343,18 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
         lows = ys[1:3:end]
         highs = ys[3:3:end]
         means = mean.(zip(mids, lows, highs))
+        # fit_OLS = curve_fit(m, xs, ys, [1, 1])
+        # peek(fit_OLS)
+        # # wt = 1 ./ fit_OLS.resid
+        # # fit_WLS = curve_fit(m, tdata, ydata, wt, p0)
+        # # cov = estimate_covar(fit_WLS)
+        X = [ones(length(means)) means]
+        @show a, b = X \ xs
+        @show a, b = pinv(X, rtol = sqrt(eps(real(float(one(eltype(X))))))) * means
+        f(x) = 1 + a * x + b * x^2
+        # scatterlines!(ax, xs, f.(xs))
+        scatterlines!(ax, xs, f.(xs))
+        var_colors = Dict(titles_vars .=> colors)
         col = var_colors[var_title]
 
         eb = errorbars!(
