@@ -10,7 +10,7 @@ using Unicode, Dates, Statistics, LinearAlgebra
 import JSON: parsefile
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
-# using Polynomials#, LsqFit#, GLM#, StatsModels#, MultivariateStats#, OnlineStats#, Grassmann
+using GLM#, Polynomials#, LsqFit#, StatsModels#, MultivariateStats#, OnlineStats#, Grassmann
 
 using Gtk
 
@@ -315,17 +315,19 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
 end
 
 
+f(x, a, b, c, d) = a + b*x + c*x^2 + d*x^3
+
 function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm, ax = nothing)
-    # f = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
-    # model = glm(f, df, Normal(), IdentityLink())
-    # ŷ = predict(model)
-    # ctbl = coeftable(model)
-    # Zs = sort!(deleteat!(ctbl.rownms .=> ctbl.cols[3], 1), by = x -> abs(getfield(x, :second)))
     colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low:medium:high variance
-    # var_colors = Dict(first.(Zs) .=> colors)
-    lin_reg(X, y) = (X'X) \ X'y
-    lin_reg_spd(X, y) = begin XtX = X'X; if isposdef!(XtX) XtX \ X'y else lin_reg(X, y) end end
-    # m(x, p) = p[1] * exp.(p[2] * x)
+
+    fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
+    model_ols = lm(fm, df)
+    println(title_resp, " deviance : ", deviance(model_ols))
+
+    variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
+    var_colors = Dict(first.(variances) .=> colors)
+
+    plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
     xs = 1 : 3
     if isnothing(ax)
         ax = parent[pos_sub[1], pos_sub[2]] = Axis(
@@ -334,27 +336,16 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
             xticks = xs,
         )
     end
-    plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
 
     for (i, var_title) ∈ enumerate(titles_vars)
         df = sort(df, [var_title, title_resp])
         ys = df[!, title_resp]
+
         mids = ys[2:3:end]
         lows = ys[1:3:end]
         highs = ys[3:3:end]
         means = mean.(zip(mids, lows, highs))
-        # fit_OLS = curve_fit(m, xs, ys, [1, 1])
-        # peek(fit_OLS)
-        # # wt = 1 ./ fit_OLS.resid
-        # # fit_WLS = curve_fit(m, tdata, ydata, wt, p0)
-        # # cov = estimate_covar(fit_WLS)
-        X = [ones(length(means)) means]
-        @show a, b = X \ xs
-        @show a, b = pinv(X, rtol = sqrt(eps(real(float(one(eltype(X))))))) * means
-        f(x) = 1 + a * x + b * x^2
-        # scatterlines!(ax, xs, f.(xs))
-        scatterlines!(ax, xs, f.(xs))
-        var_colors = Dict(titles_vars .=> colors)
+
         col = var_colors[var_title]
 
         eb = errorbars!(
@@ -381,7 +372,7 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
 
     rowsize!(parent, pos_sub[1] + 1, Relative(.05))
 
-    ax
+    ax, model_ols
 end
 
 
@@ -585,9 +576,12 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     pos_reg_cbar = (1, 1)
     pos_reg_anchor = (3, 1)
-    regr1 = regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), cm)
-    regr2 = regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), cm)
-    regr3 = regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), cm)
+    regr1, model1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), cm)
+    regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = regr1
+    regr2, model2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), cm)
+    regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = regr2
+    regr3, model3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), cm)
+    regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = regr3
     cbar_regr = regress_sublayout[pos_reg_cbar...] = Colorbar(
         main_fig,
         label = LOCALE_TR["cbar_regr_lab"],
