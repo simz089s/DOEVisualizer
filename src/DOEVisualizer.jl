@@ -10,7 +10,7 @@ using Unicode, Dates, Statistics, LinearAlgebra
 import JSON: parsefile
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
-using GLM#, Polynomials#, LsqFit#, StatsModels#, MultivariateStats#, OnlineStats#, Grassmann
+using GLM, MultivariateStats, LsqFit#, Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
 
 using Gtk
 
@@ -83,6 +83,29 @@ function get_range_scales(a)
     scal, ext, ext ./ scal
 end
 
+
+function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :circle, markersize = 80)
+    n = length(resp)
+    scal_xyz = Array{Point3, 1}(undef, n)
+    sampled_colors = Array{RGBf0, 1}(undef, n)
+
+    for i = 1 : n
+        scal_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i])
+        sampled_colors[i] = colors[resp[i]]
+    end
+
+    splot3 = scatter!(
+        lscene,
+        scal_x, scal_y, scal_z,
+        marker = marker,
+        markersize = markersize,
+        color = sampled_colors,
+        show_axis = true,
+    )
+    splot3[1][] = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
+
+    splot3
+end
 
 # Draw points and coordinates
 function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
@@ -283,46 +306,19 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 end
 
 
-function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
-    scal, ext, _ = get_range_scales(resp_df)
-
-    slider = parent[pos_sub...] = IntervalSlider(
-        fig,
-        range = ext[1] - scal : .1 : ext[2] + scal,
-        startvalues = ext,
-    )
-
-    slider_lab = parent[pos_sub[1] + 1, pos_sub[2]] = Label(
-        fig,
-        @lift(string(round.($(slider.interval), digits = 2))),
-        tellwidth = false,
-    )
-
-    on(slider.interval) do interval
-        ordered_resp = map(x -> parse(Float64, x[4:end]), resp_plot[2].input_args[1].val)
-        ext = extrema(ordered_resp)
-        lims = (min(slider.interval.val[1], ext[1]), max(slider.interval.val[2], ext[2]))
-
-        cm = cbar.colormap.val
-        resp_plot[1].colormap = cm
-        col_samp = AbstractPlotting.ColorSampler(to_colormap(cm), lims)
-        resp_plot[1].color = [col_samp[resp] for resp in ordered_resp]
-
-        cbar.limits = lims
-    end
-
-    slider, slider_lab
-end
-
-
-f(x, a, b, c, d) = a + b*x + c*x^2 + d*x^3
+curvef(x1, x2, x3, c1, c2, c3, intercept = 1; p1 = 1, p2 = 1, p3 = 1) = intercept + c1*x1^p1 + c2*x2^p2 + c3*x3^p3
+curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3 = 1)
+# @. multimodel_lin(x, p) = curvef_lin(x[:, 1], x[:, 2], x[:, 3], p...)
+# @. multimodel_lin(x, p) = 1 + (x[:, 1] * p[2]) + (x[:, 2] * p[3]) + (x[:, 3] * p[4])
+# curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
+# @. multimodel_quad(x, p) = p[1] + (x[:, 1] * p[2])^2 + (x[:, 2] * p[3])^2 + (x[:, 3] * p[4])^2
 
 function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm, ax = nothing)
     colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low:medium:high variance
 
     fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
     model_ols = lm(fm, df)
-    println(title_resp, " deviance : ", deviance(model_ols))
+    # println(title_resp, " deviance : ", deviance(model_ols))
 
     variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
     var_colors = Dict(first.(variances) .=> colors)
@@ -373,6 +369,30 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
     rowsize!(parent, pos_sub[1] + 1, Relative(.05))
 
     ax, model_ols
+end
+
+
+# Interpolate data with linear range, create cartesian product and reshape for plotting
+function interp_pairings(x, y, z, len, inner = false)
+    len = max(3, isodd(len) ? len : len - 1)
+    pairings = if inner
+        view(
+            reshape(collect(Iterators.product(
+                deleteat!(collect(range(extrema(x)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
+                deleteat!(collect(range(extrema(y)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
+                deleteat!(collect(range(extrema(z)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
+            )), (len - 3)^3, 1, 1),
+        :, 1, 1)
+    else
+        view(
+            reshape(collect(Iterators.product(
+                range(extrema(x)..., length = len),
+                range(extrema(y)..., length = len),
+                range(extrema(z)..., length = len),
+            )), len^3, 1, 1),
+        :, 1, 1)
+    end
+    first.(pairings), getindex.(pairings, 2), last.(pairings)
 end
 
 
@@ -491,6 +511,38 @@ function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt
 end
 
 
+function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
+    scal, ext, _ = get_range_scales(resp_df)
+
+    slider = parent[pos_sub...] = IntervalSlider(
+        fig,
+        range = ext[1] - scal : .1 : ext[2] + scal,
+        startvalues = ext,
+    )
+
+    slider_lab = parent[pos_sub[1] + 1, pos_sub[2]] = Label(
+        fig,
+        @lift(string(round.($(slider.interval), digits = 2))),
+        tellwidth = false,
+    )
+
+    on(slider.interval) do interval
+        ordered_resp = map(x -> parse(Float64, x[4:end]), resp_plot[2].input_args[1].val)
+        ext = extrema(ordered_resp)
+        lims = (min(slider.interval.val[1], ext[1]), max(slider.interval.val[2], ext[2]))
+
+        cm = cbar.colormap.val
+        resp_plot[1].colormap = cm
+        col_samp = AbstractPlotting.ColorSampler(to_colormap(cm), lims)
+        resp_plot[1].color = [col_samp[resp] for resp in ordered_resp]
+
+        cbar.limits = lims
+    end
+
+    slider, slider_lab
+end
+
+
 # Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
     # Delete previous plot objects
@@ -595,6 +647,23 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03))
     cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in LOCALE_TR["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
+
+    x, y, z = vars[!, 1], vars[!, 2], vars[!, 3]
+    x̂, ŷ, ẑ = interp_pairings(x, y, z, 3 + 2 * 5, true)
+    xrange, yrange, zrange = calc_range(x), calc_range(y), calc_range(z)
+    scal_x̂, scal_ŷ, scal_ẑ = x̂ / xrange, ŷ / yrange, ẑ / zrange
+    X = [x y z]
+
+    resp1 = df[!, titles_resps[1]]
+    resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model1)...)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_pred1)); marker = :rect, markersize = 30)
+    resp2 = df[!, titles_resps[2]]
+    resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model2)...)
+    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp2)); marker = :rect, markersize = 30)
+    resp_main = df[!, titles_resps[3]]
+    # resp_pred_main = curvef_lin.(x̂, ŷ, ẑ, coef(model3)...)
+    resp_pred_main = curvef.(x̂, ŷ, ẑ, llsq(X, resp_main)...)
+    plot_regr3d_main = create_plot3(lscene_main, resp_pred_main, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_main)); marker = :rect, markersize = 30)
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
