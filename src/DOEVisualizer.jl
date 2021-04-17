@@ -80,8 +80,7 @@ calc_interval(a) = abs(-(extrema(a)...))
 function get_interval_scales(a)
     scal = calc_interval(a)
     ext = extrema(a)
-    # Scale data to data/interval so that the plot is unit/equal sized
-    scal, ext, ext ./ scal
+    scal, ext, ext ./ scal # For min-max scaling/unity-based normalization
 end
 
 
@@ -109,7 +108,7 @@ function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :ci
 end
 
 # Draw points and coordinates
-function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors, markersize = 50)
     n = nrow(test_nums)
     scal_xyz = Array{Point3, 1}(undef, n)
     text_xyz = Array{String, 1}(undef, n)
@@ -127,7 +126,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         lscene,
         scal_x, scal_y, scal_z,
         marker = :circle,
-        markersize = 50,
+        markersize = markersize,
         color = sampled_colors,
         show_axis = true,
     )
@@ -152,7 +151,7 @@ end
 
 
 # Draw grid
-function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
+function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit, markersize = 45)
     line_data = Array{Array{Float64, 1}, 1}(undef, 3)
 
     # scal_uniq_var_vals index of the dimension that will draw the line
@@ -176,7 +175,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
                 line_data[1], line_data[2], line_data[3],
                 color = :black,
                 markercolor = :white,
-                markersize = 45,
+                markersize = markersize,
                 show_axis = true,
             )
         end
@@ -243,7 +242,7 @@ function create_table(fig, parent, df, ax = nothing)
 end
 
 
-function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm)
+function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG)
     resp = df[!, title_resp]
 
     # Sort to correctly map colors to points in create_points_coords() and for general convenience
@@ -253,7 +252,8 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
     y = df[!, titles_vars[2]]
     z = df[!, titles_vars[3]]
     
-    # The data is unit-scaled down/normalized so that the plot looks isometric-ish/cubic
+    # The data is min-max scaled/unity-based normalized equidistant cube (orthogonal array)
+    # "Real" 3D instead of isometric projection however
 
     interval_x, ext_x, scal_ext_x = get_interval_scales(x)
     interval_y, ext_y, scal_ext_y = get_interval_scales(y)
@@ -280,14 +280,14 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 
     colors = AbstractPlotting.ColorSampler(to_colormap(cm), extrema(resp))
 
-    create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
+    create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit, CONFIG["plot_3d_grid_markersize"])
 
     axis = lscene.scene[OldAxis]
-    axis[:showaxis] = true # Just in case `show_axis = true` doesn't work/is forgotten...
+    axis[:showaxis] = true # TODO: Necessary?
 
-    plot_pts = create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors)
+    plot_pts = create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors, CONFIG["plot_3d_markersize"])
 
-    # Correct tick labels so that they show the original values instead of the scaled down ones
+    # Correct tick labels so that they show the original values instead of the scaled/normalized ones
     xticks!(lscene.scene, xtickrange = xtickrange, xticklabels = xticklabels)
     yticks!(lscene.scene, ytickrange = ytickrange, yticklabels = yticklabels)
     zticks!(lscene.scene, ztickrange = ztickrange, zticklabels = zticklabels)
@@ -420,7 +420,7 @@ function create_save_button(fig, parent, filename; but_lab = "Save")
 end
 
 
-function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_layout, pos_fig, pos_subs, pos_regr, cm; but_lab = "Reload", window_title = "Open CSV data file...")
+function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_layout, pos_fig, pos_subs, pos_regr, cm, CONFIG; but_lab = "Reload", window_title = "Open CSV data file...")
     button = Button(
         parent,
         label = but_lab,
@@ -439,9 +439,9 @@ function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_
         # delete!(menus)
         # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
         loading_bar()
-        reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[1], cm)
-        reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[2], cm)
-        reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[3], cm)
+        reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[1], cm, CONFIG)
+        reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[2], cm, CONFIG)
+        reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[3], cm, CONFIG)
         reload_table(fig, df, tbl_ax)
         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[1], (pos_regr[1] + 0, pos_regr[2]), cm, regr_axs[1])
         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[2], (pos_regr[1] + 2, pos_regr[2]), cm, regr_axs[2])
@@ -514,7 +514,7 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
 end
 
 
-function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
+function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm, CONFIG)
     # Delete previous plot objects
     empty!(lscene.scene.plots)
     # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # Remake LScene instead of modify
@@ -523,7 +523,7 @@ function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_re
 
     plots_gridlayout = content(fig[pos_fig...])
     lscene.title.val = title_resp
-    plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG["plot_3d_markersize"])
     plots_gridlayout[pos_sub...] = lscene
     plots_gridlayout[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
 end
@@ -547,7 +547,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     titles_resps = names(resps)
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
     pos_fig = (2, 1:4)
-    cms = [cm, :RdYlGn_4, :RdYlGn_6, :RdYlGn_8, :RdYlGn_10, :redgreensplit, :diverging_gwr_55_95_c38_n256, :watermelon,]
+    cms = [:RdYlGn_4, :RdYlGn_6, :RdYlGn_8, :RdYlGn_10, :redgreensplit, :diverging_gwr_55_95_c38_n256, :watermelon, :cividis]
+    if cm ∉ cms pushfirst!(cms, cm) end
 
     @info "Creating main plot..."
     main_fig = Figure()
@@ -563,17 +564,17 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     pos_plots = [(1, 1), (1, 3), (4, 1)]
 
     lscene1 = basic_ls(main_fig, pos_fig, title)
-    plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG)
     plot_sublayout[pos_plots[1]...] = lscene1
     cbar1 = plot_sublayout[pos_plots[1][1], pos_plots[1][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
 
     lscene2 = basic_ls(main_fig, pos_fig, title)
-    plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG)
     plot_sublayout[pos_plots[2]...] = lscene2
     cbar2 = plot_sublayout[pos_plots[2][1], pos_plots[2][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
 
     lscene_main = basic_ls(main_fig, pos_fig, title)
-    plot_main = create_plots(main_fig, lscene_main, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm)
+    plot_main = create_plots(main_fig, lscene_main, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG)
     plot_sublayout[pos_plots[3]...] = lscene_main
     cbar_main = plot_sublayout[pos_plots[3][1], pos_plots[3][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
     cam_main = cameracontrols(lscene_main.scene)
@@ -640,7 +641,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
-    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_ax, [regr1, regr2, regr3], regress_sublayout, pos_fig, pos_plots, pos_reg_anchor, cm; but_lab = LOCALE_TR["reload_but_lab"], window_title = LOCALE_TR["file_dialog_window_title"])
+    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_ax, [regr1, regr2, regr3], regress_sublayout, pos_fig, pos_plots, pos_reg_anchor, cm, CONFIG; but_lab = LOCALE_TR["reload_but_lab"], window_title = LOCALE_TR["file_dialog_window_title"])
     # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
     cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cms; menu_prompt = LOCALE_TR["cm_menu_prompt"])
     button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, reload_button, cm_menu))
@@ -663,14 +664,14 @@ end
 
 
 function __init__()
-    filename_config, = args
     PREFIX = "$(@__DIR__)/../"
-    CONFIG::Dict{String, String} = parsefile(filename_config, dicttype = Dict{String, String})
+    filename_config = PREFIX * "cfg/config.json"
+    CONFIG::Dict{String, Union{String, Number}} = parsefile(filename_config, dicttype = Dict{String, Union{String, Number}})
     filename_db = PREFIX * CONFIG["db_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
-    cm::String = CONFIG["default_colormap"]
+    cm::Symbol = Symbol(CONFIG["default_colormap"])
 
-    LOCALE_TR::Dict{String, Union{String, Array{Any, 1}}} = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
+    LOCALE_TR::Dict{String, Union{String, AbstractArray{Any, 1}}} = parsefile(filename_locale, dicttype = Dict{String, Union{String, AbstractArray{Any, 1}}})
 
     filename_data::String = isempty(CONFIG["data_path"]) ?
                             open_dialog_native(LOCALE_TR["file_dialog_window_title"]) :
@@ -703,9 +704,5 @@ function __init__()
     setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, CONFIG, LOCALE_TR)
 end
 
-
-const args = (
-    "$(@__DIR__)/../cfg/config.json",
-)
 
 end

@@ -3,6 +3,8 @@
     "data_path" : "",
     "locale_path" :"cfg/locale_",
     "locale" : "EN",
-    "default_colormap" : "cividis",
+    "default_colormap" : "RdYlGn_10",
+    "plot_3d_markersize" : 50,
+    "plot_3d_grid_markersize" : 45,
     "guard_page" : ""
 }
