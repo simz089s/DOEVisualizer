@@ -10,7 +10,8 @@ using Unicode, Dates, Statistics, LinearAlgebra
 import JSON: parsefile
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
-using GLM, MultivariateStats, LsqFit#, Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
+using GLM#, MultivariateStats, LsqFit
+# using Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
 
 using Gtk
 
@@ -38,7 +39,7 @@ end
 
 function find_csv(dir)::String
     for file in readdir(dir)
-        if Unicode.normalize(last(file, 4), casefold = true) == ".csv" # Find first file that ends with .csv (case insensitive)
+        if Unicode.normalize(last(file, 4), casefold = true) in (".csv", ".tsv") # Find first file that ends with .{c,t}sv (case insensitive)
             return "$dir/$file"
         end
     end
@@ -73,11 +74,11 @@ function read_data(filename)
 end
 
 
-calc_range(a) = abs(-(extrema(a)...)) # Find interval size max-min of a set of values
+calc_interval(a) = abs(-(extrema(a)...))
 
 
-function get_range_scales(a)
-    scal = calc_range(a)
+function get_interval_scales(a)
+    scal = calc_interval(a)
     ext = extrema(a)
     # Scale data to data/interval so that the plot is unit/equal sized
     scal, ext, ext ./ scal
@@ -126,7 +127,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         lscene,
         scal_x, scal_y, scal_z,
         marker = :circle,
-        markersize = 80,#scal_plot_unit * 35.,
+        markersize = 50,
         color = sampled_colors,
         show_axis = true,
     )
@@ -136,7 +137,6 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         lscene,
         text_xyz,
         pos_xyz,
-        # textsize = scal_plot_unit * 10.,
         color = :black,
         rotations = Billboard(),
         align = (:center, :bottom),
@@ -161,13 +161,12 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
         invar_data_dim_idx1 = mod1(var_dim_idx + 1, 3)
         invar_data_dim_idx2 = mod1(var_dim_idx + 2, 3)
 
-        # for line_idx1 = 1 : 3, line_idx2 = 1 : 3
         for idx = 1 : 9
             line_idx1, line_idx2 = fldmod1(idx, 3)
             invar_val1 = scal_uniq_var_vals[invar_data_dim_idx1][line_idx1]
             invar_val2 = scal_uniq_var_vals[invar_data_dim_idx2][line_idx2]
 
-            # Plot function takes in order x,y,z
+            # Plot function takes in order x>y>z so use line_data index to keep track
             line_data[var_dim_idx] = scal_uniq_var_vals[var_dim_idx]
             line_data[invar_data_dim_idx1] = fill(invar_val1, 3)
             line_data[invar_data_dim_idx2] = fill(invar_val2, 3)
@@ -177,7 +176,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit)
                 line_data[1], line_data[2], line_data[3],
                 color = :black,
                 markercolor = :white,
-                markersize = 75,#scal_plot_unit * 33., # Just a tiny bit smaller than the coloured ones so they can be covered
+                markersize = 45,
                 show_axis = true,
             )
         end
@@ -218,7 +217,7 @@ function create_table(fig, parent, df, ax = nothing)
             yreversed = true,
         )
     end
-    sort!(df, 1) # Sort by test number
+    sort!(df, 1) # TODO: Sort by first column or "No_" for test number?
     data = string.(reshape(Matrix{Float64}(df), N))
     pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
     txt = text!(
@@ -256,13 +255,13 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
     
     # The data is unit-scaled down/normalized so that the plot looks isometric-ish/cubic
 
-    range_x, ext_x, scal_ext_x = get_range_scales(x)
-    range_y, ext_y, scal_ext_y = get_range_scales(y)
-    range_z, ext_z, scal_ext_z = get_range_scales(z)
+    interval_x, ext_x, scal_ext_x = get_interval_scales(x)
+    interval_y, ext_y, scal_ext_y = get_interval_scales(y)
+    interval_z, ext_z, scal_ext_z = get_interval_scales(z)
 
-    scal_x = x / range_x
-    scal_y = y / range_y
-    scal_z = z / range_z
+    scal_x = x / interval_x
+    scal_y = y / interval_y
+    scal_z = z / interval_z
     scal_plot_unit = mean((mean(scal_x), mean(scal_y), mean(scal_z)))
 
     xtickrange = range(scal_ext_x..., length = 3)
@@ -275,9 +274,9 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 
     uniq_var_vals = [ sort(df[.!nonunique(df, title_var), title_var]) for title_var in titles_vars ] # All unique values per variable
     # Scaled to value/interval
-    scal_uniq_var_vals = [uniq_var_vals[1] / range_x,
-                          uniq_var_vals[2] / range_y,
-                          uniq_var_vals[3] / range_z]
+    scal_uniq_var_vals = [uniq_var_vals[1] / interval_x,
+                          uniq_var_vals[2] / interval_y,
+                          uniq_var_vals[3] / interval_z]
 
     colors = AbstractPlotting.ColorSampler(to_colormap(cm), extrema(resp))
 
@@ -299,8 +298,8 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 
     create_titles(lscene, axis, titles_vars)
 
-    # scale!(lscene.scene, 1/range_x, 1/range_y, 1/range_z)
-    # axis[:scale] = [1/range_x, 1/range_y, 1/range_z]
+    # scale!(lscene.scene, 1/interval_x, 1/interval_y, 1/interval_z)
+    # axis[:scale] = [1/interval_x, 1/interval_y, 1/interval_z]
 
     plot_pts
 end
@@ -318,7 +317,6 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
 
     fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
     model_ols = lm(fm, df)
-    # println(title_resp, " deviance : ", deviance(model_ols))
 
     variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
     var_colors = Dict(first.(variances) .=> colors)
@@ -375,23 +373,24 @@ end
 # Interpolate data with linear range, create cartesian product and reshape for plotting
 function interp_pairings(x, y, z, len, inner = false)
     len = max(3, isodd(len) ? len : len - 1)
-    pairings = if inner
-        view(
-            reshape(collect(Iterators.product(
-                deleteat!(collect(range(extrema(x)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
-                deleteat!(collect(range(extrema(y)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
-                deleteat!(collect(range(extrema(z)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
-            )), (len - 3)^3, 1, 1),
-        :, 1, 1)
-    else
-        view(
-            reshape(collect(Iterators.product(
-                range(extrema(x)..., length = len),
-                range(extrema(y)..., length = len),
-                range(extrema(z)..., length = len),
-            )), len^3, 1, 1),
-        :, 1, 1)
-    end
+    pairings =
+        if inner
+            view(
+                reshape(collect(Iterators.product(
+                    deleteat!(collect(range(extrema(x)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
+                    deleteat!(collect(range(extrema(y)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
+                    deleteat!(collect(range(extrema(z)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
+                )), (len - 3)^3, 1, 1),
+            :, 1, 1)
+        else
+            view(
+                reshape(collect(Iterators.product(
+                    range(extrema(x)..., length = len),
+                    range(extrema(y)..., length = len),
+                    range(extrema(z)..., length = len),
+                )), len^3, 1, 1),
+            :, 1, 1)
+        end
     first.(pairings), getindex.(pairings, 2), last.(pairings)
 end
 
@@ -455,34 +454,6 @@ function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_
 end
 
 
-# function create_menus(fig, parent, lscene, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm)
-#     # menu_vars = Menu(
-#     #     parent,
-#     #     options = titles[1:3],
-#     #     prompt = "Select variables...",
-#     #     halign = :left,
-#     #     width = 5,
-#     # )
-
-#     menu_resp = Menu(
-#         parent,
-#         options = titles_resps,
-#         prompt = "Select response...",
-#         # halign = :right,
-#     )
-
-#     on(menu_resp.selection) do s
-#         println("Select response -> $s.")
-#         reload_plot(fig, lscene, df, vars, titles, s, titles_vars, titles_resps, num_vars, num_resps, pos_fig, (2, 1), cm)
-#     end
-
-#     # parent = grid!(hvcat(2, menu_vars, menu_resp))#, tellheight = false, tellwidth = false)
-
-#     menu_resp
-#     # menu_vars, menu_resp
-# end
-
-
 function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt = "Select color palette...")
     menu = Menu(
         parent,
@@ -512,7 +483,7 @@ end
 
 
 function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
-    scal, ext, _ = get_range_scales(resp_df)
+    scal, ext, _ = get_interval_scales(resp_df)
 
     slider = parent[pos_sub...] = IntervalSlider(
         fig,
@@ -543,7 +514,6 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
 end
 
 
-# Find way to re-render properly (+ memory management)
 function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm)
     # Delete previous plot objects
     empty!(lscene.scene.plots)
@@ -648,22 +618,25 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in LOCALE_TR["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
 
+    @info "Creating regression in 3D plots..."
+
     x, y, z = vars[!, 1], vars[!, 2], vars[!, 3]
     x̂, ŷ, ẑ = interp_pairings(x, y, z, 3 + 2 * 5, true)
-    xrange, yrange, zrange = calc_range(x), calc_range(y), calc_range(z)
+    xrange, yrange, zrange = calc_interval(x), calc_interval(y), calc_interval(z)
     scal_x̂, scal_ŷ, scal_ẑ = x̂ / xrange, ŷ / yrange, ẑ / zrange
     X = [x y z]
+    marker = :rect
+    markersize = 25.
 
     resp1 = df[!, titles_resps[1]]
     resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model1)...)
-    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_pred1)); marker = :rect, markersize = 30)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_pred1)); marker = marker, markersize = markersize)
     resp2 = df[!, titles_resps[2]]
     resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model2)...)
-    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp2)); marker = :rect, markersize = 30)
+    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp2)); marker = marker, markersize = markersize)
     resp_main = df[!, titles_resps[3]]
-    # resp_pred_main = curvef_lin.(x̂, ŷ, ẑ, coef(model3)...)
-    resp_pred_main = curvef.(x̂, ŷ, ẑ, llsq(X, resp_main)...)
-    plot_regr3d_main = create_plot3(lscene_main, resp_pred_main, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_main)); marker = :rect, markersize = 30)
+    resp_pred_main = curvef_lin.(x̂, ŷ, ẑ, coef(model3)...)
+    plot_regr3d_main = create_plot3(lscene_main, resp_pred_main, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_main)); marker = marker, markersize = markersize)
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
@@ -690,7 +663,7 @@ end
 
 
 function __init__()
-    filename_config, _ = args
+    filename_config, = args
     PREFIX = "$(@__DIR__)/../"
     CONFIG::Dict{String, String} = parsefile(filename_config, dicttype = Dict{String, String})
     filename_db = PREFIX * CONFIG["db_path"]
@@ -699,16 +672,18 @@ function __init__()
 
     LOCALE_TR::Dict{String, Union{String, Array{Any, 1}}} = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
 
-    filename_data::String = open_dialog_native(LOCALE_TR["file_dialog_window_title"])#PREFIX * CONFIG["data_path"]
+    filename_data::String = isempty(CONFIG["data_path"]) ?
+                            open_dialog_native(LOCALE_TR["file_dialog_window_title"]) :
+                            PREFIX * CONFIG["data_path"]
 
     if isempty(filename_db)
         exit("No database file found. Exiting...")
-    elseif isempty(filename_data)
-        filename_data = find_csv("$(@__DIR__)/../res")
+    elseif isempty(filename_data) # If empty data file path in config.json
+        filename_data = find_csv("$(@__DIR__)/../res") # or TSV
     end
 
     # TODO: Implement
-    if isempty(filename_data)
+    if isempty(filename_data) # If still no CSV data file path in /res/ directory
         # db = DOEVDBManager.setup(filename_db, "HEAT_TREATMENT_DATA_2")
         # query = """
         #     SELECT *
@@ -731,7 +706,6 @@ end
 
 const args = (
     "$(@__DIR__)/../cfg/config.json",
-    raw"",
 )
 
 end
