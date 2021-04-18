@@ -100,6 +100,8 @@ function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :ci
         marker = marker,
         markersize = markersize,
         color = sampled_colors,
+        strokecolor = sampled_colors,
+        # strokewidth = 0.,
         show_axis = true,
     )
     splot3[1][] = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
@@ -312,15 +314,9 @@ curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3
 # curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
 # @. multimodel_quad(x, p) = p[1] + (x[:, 1] * p[2])^2 + (x[:, 2] * p[3])^2 + (x[:, 3] * p[4])^2
 
-function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, cm, ax = nothing)
+function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, variances, cm, ax = nothing)
     colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low:medium:high variance
-
-    fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
-    model_ols = lm(fm, df)
-
-    variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
-    var_colors = Dict(first.(variances) .=> colors)
-
+    variances_colors = Dict(first.(variances) .=> colors)
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
     xs = 1 : 3
     if isnothing(ax)
@@ -340,7 +336,7 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
         highs = ys[3:3:end]
         means = mean.(zip(mids, lows, highs))
 
-        col = var_colors[var_title]
+        col = variances_colors[var_title]
 
         eb = errorbars!(
             ax,
@@ -366,21 +362,22 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
 
     rowsize!(parent, pos_sub[1] + 1, Relative(.05))
 
-    ax, model_ols
+    ax
 end
 
 
 # Interpolate data with linear range, create cartesian product and reshape for plotting
-function interp_pairings(x, y, z, len, inner = false)
+function interp_pairings(x, y, z, len, inner = false, outerval = 1, innerval = 0)
     len = max(3, isodd(len) ? len : len - 1)
     pairings =
         if inner
+            mid = ceil(Int, len / 2)
             view(
                 reshape(collect(Iterators.product(
-                    deleteat!(collect(range(extrema(x)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
-                    deleteat!(collect(range(extrema(y)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
-                    deleteat!(collect(range(extrema(z)..., length = len)), ceil(Int, len / 2))[begin + 1 : end - 1],
-                )), (len - 3)^3, 1, 1),
+                    deleteat!(collect(range(extrema(x)..., length = len)), mid-innerval:mid+innerval)[begin + outerval : end - outerval],
+                    deleteat!(collect(range(extrema(y)..., length = len)), mid-innerval:mid+innerval)[begin + outerval : end - outerval],
+                    deleteat!(collect(range(extrema(z)..., length = len)), mid-innerval:mid+innerval)[begin + outerval : end - outerval],
+                )), (len - 2outerval - 2innerval - 1)^3, 1, 1),
             :, 1, 1)
         else
             view(
@@ -538,7 +535,10 @@ end
 function reload_regr(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, cm, ax)
     ax.title = "Mean average of $title_resp values\nper single variable value"
     empty!(ax)
-    create_plot_regression(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, cm, ax)
+    fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
+    model_ols = lm(fm, df)
+    variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
+    create_plot_regression(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, variances, cm, ax)
 end
 
 
@@ -595,15 +595,38 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
     plot_sublayout[4:6, 3:4] = tbl_ax
 
+    @info "Creating regressions and interpolations..."
+    sym_var1 = Symbol(titles_vars[1])
+    sym_var2 = Symbol(titles_vars[2])
+    sym_var3 = Symbol(titles_vars[3])
+    fm1 = @eval @formula($(Symbol(titles_resps[1])) ~ $sym_var1 + $sym_var2 + $sym_var3)
+    fm2 = @eval @formula($(Symbol(titles_resps[2])) ~ $sym_var1 + $sym_var2 + $sym_var3)
+    fm3 = @eval @formula($(Symbol(titles_resps[3])) ~ $sym_var1 + $sym_var2 + $sym_var3)
+    model_ols1 = lm(fm1, df)
+    model_ols2 = lm(fm2, df)
+    model_ols3 = lm(fm3, df)
+    get_abs_sec(x) = abs(x.second)
+    variances1 = sort!(deleteat!(coefnames(model_ols1) .=> diag(vcov(model_ols1)), 1), by = get_abs_sec)
+    variances2 = sort!(deleteat!(coefnames(model_ols2) .=> diag(vcov(model_ols2)), 1), by = get_abs_sec)
+    variances3 = sort!(deleteat!(coefnames(model_ols3) .=> diag(vcov(model_ols3)), 1), by = get_abs_sec)
+
+    resolution = markersize, density = 15, 20
+    marker = :rect
+    var1, var2, var3 = eachcol(vars)
+    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2 * density, true, 1, 3)
+    xrange, yrange, zrange = calc_interval(var1), calc_interval(var2), calc_interval(var3)
+    scal_x̂, scal_ŷ, scal_ẑ = x̂ / xrange, ŷ / yrange, ẑ / zrange
+    X = [var1 var2 var3]
+
     @info "Creating comparison plots..."
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     pos_reg_cbar = (1, 1)
     pos_reg_anchor = (3, 1)
-    regr1, model1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), cm)
+    regr1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), variances1, cm)
     regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = regr1
-    regr2, model2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), cm)
+    regr2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), variances2, cm)
     regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = regr2
-    regr3, model3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), cm)
+    regr3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), variances3, cm)
     regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = regr3
     cbar_regr = regress_sublayout[pos_reg_cbar...] = Colorbar(
         main_fig,
@@ -619,24 +642,15 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in LOCALE_TR["cbar_regr_labs"]])))
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
 
-    @info "Creating regression in 3D plots..."
-
-    x, y, z = vars[!, 1], vars[!, 2], vars[!, 3]
-    x̂, ŷ, ẑ = interp_pairings(x, y, z, 3 + 2 * 5, true)
-    xrange, yrange, zrange = calc_interval(x), calc_interval(y), calc_interval(z)
-    scal_x̂, scal_ŷ, scal_ẑ = x̂ / xrange, ŷ / yrange, ẑ / zrange
-    X = [x y z]
-    marker = :rect
-    markersize = 25.
-
+    @info "Creating new points..."
     resp1 = df[!, titles_resps[1]]
-    resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model1)...)
+    resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols1)...)
     plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_pred1)); marker = marker, markersize = markersize)
     resp2 = df[!, titles_resps[2]]
-    resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model2)...)
+    resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols2)...)
     plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp2)); marker = marker, markersize = markersize)
     resp_main = df[!, titles_resps[3]]
-    resp_pred_main = curvef_lin.(x̂, ŷ, ẑ, coef(model3)...)
+    resp_pred_main = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols3)...)
     plot_regr3d_main = create_plot3(lscene_main, resp_pred_main, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_main)); marker = marker, markersize = markersize)
 
     @info "Creating other widgets..."
