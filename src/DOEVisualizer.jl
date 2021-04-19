@@ -315,7 +315,7 @@ curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3
 # @. multimodel_quad(x, p) = p[1] + (x[:, 1] * p[2])^2 + (x[:, 2] * p[3])^2 + (x[:, 3] * p[4])^2
 
 function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, variances, cm, ax = nothing)
-    colors = to_colormap(:RdYlGn_4, 3) # red:yellow:green :: low:medium:high variance
+    colors = to_colormap(cm, 3) # lower < middle < higher variance
     variances_colors = Dict(first.(variances) .=> colors)
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
     xs = 1 : 3
@@ -549,6 +549,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     pos_fig = (2, 1:4)
     cms = [:RdYlGn_4, :RdYlGn_6, :RdYlGn_8, :RdYlGn_10, :redgreensplit, :diverging_gwr_55_95_c38_n256, :watermelon, :cividis]
     if cm ∉ cms pushfirst!(cms, cm) end
+    cm_variances = Symbol(CONFIG["colormap_variance_comparison"])
+    cm_regr3d = Symbol(CONFIG["colormap_3d_regression"])
 
     @info "Creating main plot..."
     main_fig = Figure()
@@ -581,8 +583,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     # cam_main = cam3d!(lscene_main.scene)
 
     lscene1.scene.camera = lscene_main.scene.camera
-    lscene1.scene.camera_controls[] = cam_main
     lscene2.scene.camera = lscene_main.scene.camera
+    lscene1.scene.camera_controls[] = cam_main
     lscene2.scene.camera_controls[] = cam_main
 
     lscenes = [lscene1, lscene2, lscene_main]
@@ -610,53 +612,51 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     variances2 = sort!(deleteat!(coefnames(model_ols2) .=> diag(vcov(model_ols2)), 1), by = get_abs_sec)
     variances3 = sort!(deleteat!(coefnames(model_ols3) .=> diag(vcov(model_ols3)), 1), by = get_abs_sec)
 
-    resolution = markersize, density = 15, 20
+    resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], CONFIG["plot_3d_regression_density"]
     marker = :rect
     var1, var2, var3 = eachcol(vars)
-    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2 * density, true, 1, 3)
+    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2 * density, true, CONFIG["plot_3d_regression_outer_cut"], CONFIG["plot_3d_regression_inner_cut"])
     xrange, yrange, zrange = calc_interval(var1), calc_interval(var2), calc_interval(var3)
     scal_x̂, scal_ŷ, scal_ẑ = x̂ / xrange, ŷ / yrange, ẑ / zrange
-    X = [var1 var2 var3]
 
     @info "Creating comparison plots..."
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     pos_reg_cbar = (1, 1)
     pos_reg_anchor = (3, 1)
-    regr1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), variances1, cm)
+    regr1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), variances1, cm_variances)
+    regr2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), variances2, cm_variances)
+    regr3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), variances3, cm_variances)
     regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = regr1
-    regr2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), variances2, cm)
     regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = regr2
-    regr3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), variances3, cm)
     regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = regr3
     cbar_regr = regress_sublayout[pos_reg_cbar...] = Colorbar(
         main_fig,
         label = LOCALE_TR["cbar_regr_lab"],
         limits = (1, 3),
-        colormap = cgrad(:RdYlGn_4, 3, categorical = true),
+        colormap = cgrad(cm_variances, 3, categorical = true),
         vertical = false,
         labelpadding = 5.,
         ticksize = 0.,
         ticklabelsvisible = false,
     )
-    rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03))
     cbar_regr_labs = regress_sublayout[pos_reg_cbar[1] + 1, pos_reg_cbar[2]] = grid!(permutedims(hcat([Label(main_fig, lab, tellwidth = false) for lab in LOCALE_TR["cbar_regr_labs"]])))
-    rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001))
+    rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03)) # For colorbar
+    rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001)) # For colorbar labels
 
-    @info "Creating new points..."
+    @info "Creating new generated points..."
     resp1 = df[!, titles_resps[1]]
-    resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols1)...)
-    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_pred1)); marker = marker, markersize = markersize)
     resp2 = df[!, titles_resps[2]]
-    resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols2)...)
-    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp2)); marker = marker, markersize = markersize)
     resp_main = df[!, titles_resps[3]]
-    resp_pred_main = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols3)...)
-    plot_regr3d_main = create_plot3(lscene_main, resp_pred_main, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(:RdYlGn_10), extrema(resp_main)); marker = marker, markersize = markersize)
+    resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols1)...)
+    resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols2)...)
+    resp_pred3 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols3)...)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp_pred1)); marker = marker, markersize = markersize)
+    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
+    plot_regr3d_main = create_plot3(lscene_main, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp_main)); marker = marker, markersize = markersize)
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
     reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_ax, [regr1, regr2, regr3], regress_sublayout, pos_fig, pos_plots, pos_reg_anchor, cm, CONFIG; but_lab = LOCALE_TR["reload_but_lab"], window_title = LOCALE_TR["file_dialog_window_title"])
-    # menus = create_menus(main_fig, main_fig[1, 3:4], lscene1, df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # Created before reload button to be updated
     cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cms; menu_prompt = LOCALE_TR["cm_menu_prompt"])
     button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, reload_button, cm_menu))
 
