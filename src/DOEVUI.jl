@@ -5,7 +5,7 @@ using Gtk
 import JSON: parsefile
 
 include("DOEVDBManager.jl")
-using DOEVisualizer
+include("DOEVisualizer.jl") # TODO: For release use using DOEVisualizer ?
 
 
 function on_button_clicked(widget)

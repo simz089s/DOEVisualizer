@@ -7,7 +7,6 @@ module DOEVisualizer
 # using BenchmarkTools
 
 using Unicode, Dates, Statistics, LinearAlgebra
-# import JSON: parsefile
 using CSV, DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, MultivariateStats, LsqFit
@@ -417,38 +416,38 @@ function create_save_button(fig, parent, filename; but_lab = "Save")
 end
 
 
-function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_layout, pos_fig, pos_subs, pos_regr, cm, CONFIG; but_lab = "Reload", window_title = "Open CSV data file...")
-    button = Button(
-        parent,
-        label = but_lab,
-    )
+# function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_layout, pos_fig, pos_subs, pos_regr, cm, CONFIG; but_lab = "Reload", window_title = "Open CSV data file...")
+#     button = Button(
+#         parent,
+#         label = but_lab,
+#     )
 
-    on(button.clicks) do n
-        filename_data = open_dialog_native(window_title)
-        println("$(button.label[]) -> $filename_data.")
-        if isempty(filename_data) return end
+#     on(button.clicks) do n
+#         filename_data = open_dialog_native(window_title)
+#         println("$(button.label[]) -> $filename_data.")
+#         if isempty(filename_data) return end
 
-        df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
-        titles_vars = names(vars)
-        titles_resps = names(resps)
+#         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
+#         titles_vars = names(vars)
+#         titles_resps = names(resps)
 
-        # menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
-        # delete!(menus)
-        # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
-        loading_bar()
-        reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[1], cm, CONFIG)
-        reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[2], cm, CONFIG)
-        reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[3], cm, CONFIG)
-        reload_table(fig, df, tbl_ax)
-        reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[1], (pos_regr[1] + 0, pos_regr[2]), cm, regr_axs[1])
-        reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[2], (pos_regr[1] + 2, pos_regr[2]), cm, regr_axs[2])
-        reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[3], (pos_regr[1] + 4, pos_regr[2]), cm, regr_axs[3])
+#         # menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
+#         # delete!(menus)
+#         # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
+#         loading_bar()
+#         reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[1], cm, CONFIG)
+#         reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[2], cm, CONFIG)
+#         reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[3], cm, CONFIG)
+#         reload_table(fig, df, tbl_ax)
+#         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[1], (pos_regr[1] + 0, pos_regr[2]), cm, regr_axs[1])
+#         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[2], (pos_regr[1] + 2, pos_regr[2]), cm, regr_axs[2])
+#         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[3], (pos_regr[1] + 4, pos_regr[2]), cm, regr_axs[3])
 
-        display(fig) # TODO: display() should not be called in callback?
-    end
+#         display(fig) # TODO: display() should not be called in callback?
+#     end
 
-    button
-end
+#     button
+# end
 
 
 function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt = "Select color palette...")
@@ -511,35 +510,35 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
 end
 
 
-function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm, CONFIG)
-    # Delete previous plot objects
-    empty!(lscene.scene.plots)
-    # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # Remake LScene instead of modify
-    cbar = filter(x -> typeof(x) == Colorbar, fig.content)[1]
-    delete!(cbar)
+# function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm, CONFIG)
+#     # Delete previous plot objects
+#     empty!(lscene.scene.plots)
+#     # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # Remake LScene instead of modify
+#     cbar = filter(x -> typeof(x) == Colorbar, fig.content)[1]
+#     delete!(cbar)
 
-    plots_gridlayout = content(fig[pos_fig...])
-    lscene.title.val = title_resp
-    plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG["plot_3d_markersize"])
-    plots_gridlayout[pos_sub...] = lscene
-    plots_gridlayout[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
-end
-
-
-function reload_table(fig, df, ax)
-    empty!(ax)
-    create_table(fig, fig, df, ax)
-end
+#     plots_gridlayout = content(fig[pos_fig...])
+#     lscene.title.val = title_resp
+#     plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG["plot_3d_markersize"])
+#     plots_gridlayout[pos_sub...] = lscene
+#     plots_gridlayout[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
+# end
 
 
-function reload_regr(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, cm, ax)
-    ax.title = "Mean average of $title_resp values\nper single variable value"
-    empty!(ax)
-    fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
-    model_ols = lm(fm, df)
-    variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
-    create_plot_regression(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, variances, cm, ax)
-end
+# function reload_table(fig, df, ax)
+#     empty!(ax)
+#     create_table(fig, fig, df, ax)
+# end
+
+
+# function reload_regr(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, cm, ax)
+#     ax.title = "Mean average of $title_resp values\nper single variable value"
+#     empty!(ax)
+#     fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
+#     model_ols = lm(fm, df)
+#     variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
+#     create_plot_regression(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, variances, cm, ax)
+# end
 
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, CONFIG, LOCALE_TR)
@@ -656,9 +655,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
 
     @info "Creating other widgets..."
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
-    reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_ax, [regr1, regr2, regr3], regress_sublayout, pos_fig, pos_plots, pos_reg_anchor, cm, CONFIG; but_lab = LOCALE_TR["reload_but_lab"], window_title = LOCALE_TR["file_dialog_window_title"])
+    # reload_button = create_reload_button(main_fig, main_fig[1, 2], lscenes, tbl_ax, [regr1, regr2, regr3], regress_sublayout, pos_fig, pos_plots, pos_reg_anchor, cm, CONFIG; but_lab = LOCALE_TR["reload_but_lab"], window_title = LOCALE_TR["file_dialog_window_title"])
     cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot_main], [cbar1, cbar2, cbar_main], [cm_slider1, cm_slider2, cm_slider_main], cms; menu_prompt = LOCALE_TR["cm_menu_prompt"])
-    button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, reload_button, cm_menu))
+    button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, cm_menu))
 
     trim!(main_fig.layout)
 
@@ -675,48 +674,6 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
 
     display(main_fig)
 end
-
-
-# function __init__()
-#     PREFIX = "$(@__DIR__)/../"
-#     filename_config = PREFIX * "cfg/config.json"
-#     CONFIG::Dict{String, Union{String, Number}} = parsefile(filename_config, dicttype = Dict{String, Union{String, Number}})
-#     filename_db = PREFIX * CONFIG["db_path"]
-#     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
-#     cm::Symbol = Symbol(CONFIG["default_colormap"])
-
-#     LOCALE_TR::Dict{String, Union{String, AbstractArray{Any, 1}}} = parsefile(filename_locale, dicttype = Dict{String, Union{String, AbstractArray{Any, 1}}})
-
-#     filename_data::String = isempty(CONFIG["data_path"]) ?
-#                             open_dialog_native(LOCALE_TR["file_dialog_window_title"]) :
-#                             PREFIX * CONFIG["data_path"]
-
-#     if isempty(filename_db)
-#         exit("No database file found. Exiting...")
-#     elseif isempty(filename_data) # If empty data file path in config.json
-#         filename_data = find_csv("$(@__DIR__)/../res") # or TSV
-#     end
-
-#     # TODO: Implement
-#     if isempty(filename_data) # If still no CSV data file path in /res/ directory
-#         # db = DOEVDBManager.setup(filename_db, "HEAT_TREATMENT_DATA_2")
-#         # query = """
-#         #     SELECT *
-#         #     FROM $tablename;
-#         # """
-#         # df = get_data(db, query)
-#         @error "NOT IMPLEMENTED YET: Get data from DB when no CSV file"
-#         exit(1)
-#     else
-#         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
-#         # db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
-#         println("Loaded $filename_data")
-#     end
-#     # display(df_test)
-
-#     @info "Setting up interface and plots..."
-#     setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, CONFIG, LOCALE_TR)
-# end
 
 
 end
