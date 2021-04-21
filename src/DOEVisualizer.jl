@@ -3,19 +3,13 @@ module DOEVisualizer
 
 @info "Loading libraries..."
 
-# using PackageCompiler
-# using BenchmarkTools
-
-using Unicode, Dates, Statistics, LinearAlgebra
-using CSV, DataFrames
+using Statistics, LinearAlgebra
+using DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, MultivariateStats, LsqFit
 # using Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
 
-using Gtk
-
-# include("DOEVUI.jl")
-# include("DOEVDBManager.jl")
+import Gtk: open_dialog, open_dialog_native, save_dialog, save_dialog_native, Null, GtkNullContainer, GtkFileFilter
 
 
 @info "Loading functions..."
@@ -33,43 +27,6 @@ using Gtk
 function peek(thing)
     println(fieldnames(typeof(thing)))
     println(thing)
-end
-
-
-function find_csv(dir)::String
-    for file in readdir(dir)
-        if Unicode.normalize(last(file, 4), casefold = true) in (".csv", ".tsv") # Find first file that ends with .{c,t}sv (case insensitive)
-            return "$dir/$file"
-        end
-    end
-    ""
-end
-
-
-function read_data(filename)
-    df = DataFrame(CSV.File(filename))
-
-    # First row after title should be indicating if the column is a variable or response (except for test number column)
-    types = map(t -> ismissing(t) ? "" : t, df[1, :])
-    # num_lvls = num_vars * num_resps
-    # num_rows = nrow(df) - 1 # Exclude row indicating if it is a variable or response column
-    # idx_miss = [i for (i, t) in enumerate(types) if t == ""] # Missing type column indices
-    # select!(df, Not(idx_miss)) # TODO: better way of knowing test number column (should always be first column?)
-    df[1, 1] = 0 # Change Missing test number to 0
-    types = df[1, :]
-    idx_vars = [i for (i, t) in enumerate(types) if t == "variable"] # Variables column indices
-    idx_resps = [i for (i, t) in enumerate(types) if t == "response"] # Responses column indices
-
-    titles = replace.(names(df), " " => "_")
-    rename!(df, titles)
-    delete!(df, 1) # Remove the row indicating if it is a variable or response column
-    # df[!, :] = parse.(Float64, df[!, :]) # Float64 for max compatibility with libraries...
-    # df[!, 1] = parse.(Int8, df[!, 1])
-    df[!, 2:end] = parse.(Float64, df[!, 2:end])
-    vars = select(df, idx_vars)
-    resps = select(df, idx_resps)
-
-    df, titles[2:end], vars, resps, length(idx_vars), length(idx_resps)#, num_rows
 end
 
 
@@ -398,56 +355,24 @@ function loading_bar()
 end
 
 
-function create_save_button(fig, parent, filename; but_lab = "Save")
+function create_save_button(fig, parent, filename_save; but_lab = "Save")
     button = Button(
         parent,
         label = but_lab,
     )
 
     on(button.clicks) do n
-        println("$(button.label[]) -> $filename.")
+        println("$(button.label[]) -> $filename_save.")
+        # filename = save_dialog_native(but_lab, Null(), (GtkFileFilter(mimetype = "text/csv"), GtkFileFilter(mimetype = "text/tsv")))
+        filename = save_dialog_native(but_lab, GtkNullContainer(), ("*.csv", "*.tsv", "*"))
         fig.scene.center = false
-        save(filename, fig.scene)
+        save(isempty(filename) ? filename_save : filename, fig.scene)
         fig.scene.center = true
         display(fig) # TODO: display() should not be called in callback?
     end
 
     button
 end
-
-
-# function create_reload_button(fig, parent, lscenes, tbl_ax, regr_axs, regr_grid_layout, pos_fig, pos_subs, pos_regr, cm, CONFIG; but_lab = "Reload", window_title = "Open CSV data file...")
-#     button = Button(
-#         parent,
-#         label = but_lab,
-#     )
-
-#     on(button.clicks) do n
-#         filename_data = open_dialog_native(window_title)
-#         println("$(button.label[]) -> $filename_data.")
-#         if isempty(filename_data) return end
-
-#         df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
-#         titles_vars = names(vars)
-#         titles_resps = names(resps)
-
-#         # menus = filter(x -> typeof(x) == Menu, fig.content)[1] # TODO: make sure deleting the *right* menu(s)
-#         # delete!(menus)
-#         # create_menus(fig, fig[1, 3:4], lscenes[1], df, vars, titles, titles_vars, titles_resps, num_vars, num_resps, pos_fig, cm) # TODO: better way to choose parent position
-#         loading_bar()
-#         reload_plot(fig, lscenes[1], df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[1], cm, CONFIG)
-#         reload_plot(fig, lscenes[2], df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[2], cm, CONFIG)
-#         reload_plot(fig, lscenes[3], df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_subs[3], cm, CONFIG)
-#         reload_table(fig, df, tbl_ax)
-#         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[1], (pos_regr[1] + 0, pos_regr[2]), cm, regr_axs[1])
-#         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[2], (pos_regr[1] + 2, pos_regr[2]), cm, regr_axs[2])
-#         reload_regr(fig, regr_grid_layout, df, titles_vars, titles_resps[3], (pos_regr[1] + 4, pos_regr[2]), cm, regr_axs[3])
-
-#         display(fig) # TODO: display() should not be called in callback?
-#     end
-
-#     button
-# end
 
 
 function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt = "Select color palette...")
@@ -478,12 +403,14 @@ function create_cm_menu(fig, parent, splots, cbars, cm_sliders, cms; menu_prompt
 end
 
 
-function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
+function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, resp_range_limits, pos_sub)
     scal, ext, _ = get_interval_scales(resp_df)
+    slider_min = isnothing(resp_range_limits[1]) ? ext[1] - scal : resp_range_limits[1]
+    slider_max = isnothing(resp_range_limits[2]) ? ext[2] + scal : resp_range_limits[2]
 
     slider = parent[pos_sub...] = IntervalSlider(
         fig,
-        range = ext[1] - scal : .1 : ext[2] + scal,
+        range = slider_min : .05 : slider_max,
         startvalues = ext,
     )
 
@@ -510,41 +437,9 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, pos_sub)
 end
 
 
-# function reload_plot(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, pos_fig, pos_sub, cm, CONFIG)
-#     # Delete previous plot objects
-#     empty!(lscene.scene.plots)
-#     # delete!(filter(x -> typeof(x) == LScene, fig.content)[1]) # Remake LScene instead of modify
-#     cbar = filter(x -> typeof(x) == Colorbar, fig.content)[1]
-#     delete!(cbar)
-
-#     plots_gridlayout = content(fig[pos_fig...])
-#     lscene.title.val = title_resp
-#     plot_new = create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_resps, num_vars, num_resps, cm, CONFIG["plot_3d_markersize"])
-#     plots_gridlayout[pos_sub...] = lscene
-#     plots_gridlayout[pos_sub[1], pos_sub[2] + 1] = create_colorbar(fig, fig[pos_fig...], select(df, title_resp), title_resp, cm)
-# end
-
-
-# function reload_table(fig, df, ax)
-#     empty!(ax)
-#     create_table(fig, fig, df, ax)
-# end
-
-
-# function reload_regr(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, cm, ax)
-#     ax.title = "Mean average of $title_resp values\nper single variable value"
-#     empty!(ax)
-#     fm = @eval @formula($(Symbol(title_resp)) ~ $(Symbol(titles_vars[1])) + $(Symbol(titles_vars[2])) + $(Symbol(titles_vars[3])))
-#     model_ols = lm(fm, df)
-#     variances = sort!(deleteat!(coefnames(model_ols) .=> diag(vcov(model_ols)), 1), by = x -> abs(x.second))
-#     create_plot_regression(fig, grid_layout, df, titles_vars, title_resp, pos_reg_anchor, variances, cm, ax)
-# end
-
-
-function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, CONFIG, LOCALE_TR)
+function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, plot3d_regr_opts, filename_save, cm, CONFIG, LOCALE_TR)
     titles_vars = names(vars)
     titles_resps = names(resps)
-    filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(vcat(titles_vars, titles_resps), '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
     pos_fig = (2, 1:4)
     cms = [:RdYlGn_4, :RdYlGn_6, :RdYlGn_8, :RdYlGn_10, :redgreensplit, :diverging_gwr_55_95_c38_n256, :watermelon, :cividis]
     if cm ∉ cms pushfirst!(cms, cm) end
@@ -588,9 +483,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
 
     lscenes = [lscene1, lscene2, lscene_main]
 
-    cm_slider1, cm_slider_lab1 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 1], plot1, cbar1, (2, 1:2))
-    cm_slider2, cm_slider_lab2 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 2], plot2, cbar2, (2, 3:4))
-    cm_slider_main, cm_slider_lab_main = create_cm_sliders(main_fig, plot_sublayout, resps[!, 3], plot_main, cbar_main, (5, 1:2))
+    cm_slider1, cm_slider_lab1 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 1], plot1, cbar1, resp_range_limits[1], (2, 1:2))
+    cm_slider2, cm_slider_lab2 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 2], plot2, cbar2, resp_range_limits[2], (2, 3:4))
+    cm_slider_main, cm_slider_lab_main = create_cm_sliders(main_fig, plot_sublayout, resps[!, 3], plot_main, cbar_main, resp_range_limits[3], (5, 1:2))
 
     @info "Creating data table..."
     tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
@@ -611,10 +506,12 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_data, cm, 
     variances2 = sort!(deleteat!(coefnames(model_ols2) .=> diag(vcov(model_ols2)), 1), by = get_abs_sec)
     variances3 = sort!(deleteat!(coefnames(model_ols3) .=> diag(vcov(model_ols3)), 1), by = get_abs_sec)
 
-    resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], CONFIG["plot_3d_regression_density"]
+    resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], isnothing(plot3d_regr_opts[1]) ? CONFIG["plot_3d_regression_density"] : plot3d_regr_opts[1]
+    outercut = isnothing(plot3d_regr_opts[2]) ? CONFIG["plot_3d_regression_outer_cut"] : plot3d_regr_opts[2]
+    innercut = isnothing(plot3d_regr_opts[3]) ? CONFIG["plot_3d_regression_inner_cut"] : plot3d_regr_opts[3]
     marker = :rect
     var1, var2, var3 = eachcol(vars)
-    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2 * density, true, CONFIG["plot_3d_regression_outer_cut"], CONFIG["plot_3d_regression_inner_cut"])
+    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2 * density, true, outercut, innercut)
     xrange, yrange, zrange = calc_interval(var1), calc_interval(var2), calc_interval(var3)
     scal_x̂, scal_ŷ, scal_ẑ = x̂ / xrange, ŷ / yrange, ẑ / zrange
 
