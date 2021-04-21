@@ -1,2 +1,2 @@
 ECHO ON
-julia -i src/DOEVisualizer.jl
+julia -i src/DOEVUI.jl
