@@ -437,7 +437,7 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, resp_range_lim
 end
 
 
-function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, plot3d_regr_opts, filename_save, cm, CONFIG, LOCALE_TR)
+function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, filename_save, cm, CONFIG, LOCALE_TR)
     titles_vars = names(vars)
     titles_resps = names(resps)
     pos_fig = (2, 1:4)
@@ -506,9 +506,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
     variances2 = sort!(deleteat!(coefnames(model_ols2) .=> diag(vcov(model_ols2)), 1), by = get_abs_sec)
     variances3 = sort!(deleteat!(coefnames(model_ols3) .=> diag(vcov(model_ols3)), 1), by = get_abs_sec)
 
-    resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], isnothing(plot3d_regr_opts[1]) ? CONFIG["plot_3d_regression_density"] : plot3d_regr_opts[1]
-    outercut = isnothing(plot3d_regr_opts[2]) ? CONFIG["plot_3d_regression_outer_cut"] : plot3d_regr_opts[2]
-    innercut = isnothing(plot3d_regr_opts[3]) ? CONFIG["plot_3d_regression_inner_cut"] : plot3d_regr_opts[3]
+    resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], CONFIG["plot_3d_regression_density"]
+    outercut = CONFIG["plot_3d_regression_outer_cut"]
+    innercut = CONFIG["plot_3d_regression_inner_cut"]
     marker = :rect
     var1, var2, var3 = eachcol(vars)
     x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2 * density, true, outercut, innercut)

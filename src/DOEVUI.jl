@@ -49,10 +49,10 @@ function read_data(filename)
 end
 
 
-function on_load_button_clicked(w, resp_range_limits, plot3d_regr_opts)
+function on_load_button_clicked(w, CONFIG_NEW, resp_range_limits)
     PREFIX = "$(@__DIR__)/../"
     filename_config = PREFIX * "cfg/config.json"
-    CONFIG::Dict{String, Union{String, Number}} = parsefile(filename_config, dicttype = Dict{String, Union{String, Number}})
+    CONFIG = mergewith!((v1, v2) -> isnothing(v2) ? v1 : v2, parsefile(filename_config, dicttype = Dict{String, Union{String, Number}}), CONFIG_NEW)
     filename_db = PREFIX * CONFIG["db_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
     cm::Symbol = Symbol(CONFIG["default_colormap"])
@@ -89,60 +89,67 @@ function on_load_button_clicked(w, resp_range_limits, plot3d_regr_opts)
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(titles, '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
 
     @info "Setting up interface and plots..."; flush(stdout); flush(stderr)
-    DOEVisualizer.setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, plot3d_regr_opts, filename_save, cm, CONFIG, LOCALE_TR)
+    DOEVisualizer.setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, filename_save, cm, CONFIG, LOCALE_TR)
 end
 
 
-# function on_settings_button_clicked(w)
-# end
+function on_settings_button_clicked(w)
+end
 
 
 function __init__()
+    margin_space = 15
+
     win = GtkWindow("DoE Visualizer")
 
     grid = GtkGrid()
     push!(win, grid)
 
-    menu = grid[1, 1] = GtkButtonBox(:h)
-    load_btn = GtkButton("Load")
-    # settings_btn = GtkButton("Settings")
-    push!(menu, load_btn)
-    # push!(menu, settings_btn)
-    
-    resp_range_limits_grid = grid[1, 2] = GtkGrid()
-    set_gtk_property!(resp_range_limits_grid, :column_spacing, 15)
-    resp_range_limits_grid[2, 1], resp_range_limits_grid[3, 1] = GtkLabel("Min"), GtkLabel("Max")
-    resp_range_limits_grid[1, 2] = GtkLabel("Response 1")
-    resp_range_limits_grid[1, 3] = GtkLabel("Response 2")
-    resp_range_limits_grid[1, 4] = GtkLabel("Response 3")
-    resp_range_limits_entries1 = resp_range_limits_grid[2, 2], resp_range_limits_grid[3, 2] = GtkEntry(), GtkEntry()
-    resp_range_limits_entries2 = resp_range_limits_grid[2, 3], resp_range_limits_grid[3, 3] = GtkEntry(), GtkEntry()
-    resp_range_limits_entries3 = resp_range_limits_grid[2, 4], resp_range_limits_grid[3, 4] = GtkEntry(), GtkEntry()
-    resp_range_limits_entries = (resp_range_limits_entries1, resp_range_limits_entries2, resp_range_limits_entries3)
-    set_gtk_property!.(resp_range_limits_entries1, :placeholder_text, "0")
-    set_gtk_property!.(resp_range_limits_entries2, :placeholder_text, "0")
-    set_gtk_property!.(resp_range_limits_entries3, :placeholder_text, "0")
+    resp_range_limits_grid = grid[1, 1] = GtkGrid()
+    set_gtk_property!(resp_range_limits_grid, :column_spacing, margin_space)
+    set_gtk_property!(resp_range_limits_grid, :margin, margin_space)
+    resp_range_limits_grid[1:3, 1] = GtkLabel("Response range limits")
+    resp_range_limits_grid[2, 2], resp_range_limits_grid[3, 2] = GtkLabel("Min"), GtkLabel("Max")
+    row_offset = 2
+    resp_range_limits_entries = Vector{Tuple{Gtk.GtkEntryLeaf, Gtk.GtkEntryLeaf}}(undef, 3)
+    for row = 1 : 3
+        resp_range_limits_grid[1, row + row_offset] = GtkLabel("Response $row")
+        resp_range_limits_entries[row] = resp_range_limits_grid[2, row + row_offset], resp_range_limits_grid[3, row + row_offset] = GtkEntry(), GtkEntry()
+        set_gtk_property!.(resp_range_limits_entries[row], :placeholder_text, "0")
+    end
 
-    plot3d_regr_grid = grid[1, 3] = GtkGrid()
-    set_gtk_property!(plot3d_regr_grid, :column_spacing, 15)
-    plot3d_regr_grid[1:2, 1] = GtkLabel("3D plot regression options")
-    plot3d_regr_grid[1, 2] = GtkLabel("Density")
-    plot3d_regr_grid[1, 3] = GtkLabel("Outer cut")
-    plot3d_regr_grid[1, 4] = GtkLabel("Inner cut")
-    plot3d_regr_grid[1:2, 5] = GtkLabel("You must have (outer cut + inner cut < density)")
-    plot3d_regr_density = plot3d_regr_grid[2, 2] = GtkEntry()
-    plot3d_regr_outercut = plot3d_regr_grid[2, 3] = GtkEntry()
-    plot3d_regr_innercut = plot3d_regr_grid[2, 4] = GtkEntry()
-    set_gtk_property!(plot3d_regr_density, :placeholder_text, "7")
-    set_gtk_property!(plot3d_regr_outercut, :placeholder_text, "1")
-    set_gtk_property!(plot3d_regr_innercut, :placeholder_text, "1")
+    plot3d_regr_grid = grid[1, 2] = GtkGrid()
+    set_gtk_property!(plot3d_regr_grid, :column_spacing, margin_space)
+    set_gtk_property!(plot3d_regr_grid, :margin, margin_space)
+    plot3d_regr_grid[1:3, 1] = GtkLabel("3D plot regression options")
+    row_offset = 1
+    plot3d_regr_entries_info = [
+        "plot_3d_regression_density" => ("Density", "7"),
+        "plot_3d_regression_outer_cut" => ("Outer cut", "1"),
+        "plot_3d_regression_inner_cut" => ("Inner cut", "1"),
+    ]
+    plot3d_regr_entries = Vector{Gtk.GtkEntryLeaf}(undef, length(plot3d_regr_entries_info))
+    for (row, (_, (lab, txt))) in enumerate(plot3d_regr_entries_info)
+        plot3d_regr_grid[1, row + row_offset] = GtkLabel(lab)
+        plot3d_regr_entries[row] = plot3d_regr_grid[2:3, row + row_offset] = GtkEntry()
+        set_gtk_property!(plot3d_regr_entries[row], :placeholder_text, txt)
+    end
+    plot3d_regr_grid[2:3, 5] = GtkLabel("You must have (outer cut + inner cut < density)")
+
+    menu = grid[1, 3] = GtkButtonBox(:h)
+    set_gtk_property!(menu, :margin, 2margin_space)
+    load_btn = GtkButton("Visualize")
+    settings_btn = GtkButton("Settings")
+    push!(menu, load_btn)
+    push!(menu, settings_btn)
 
     signal_connect(load_btn, "clicked") do w
         resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
-        plot3d_regr_opts = tryparse.(Int32, get_gtk_property.((plot3d_regr_density, plot3d_regr_outercut, plot3d_regr_innercut), :text, String))
-        on_load_button_clicked(w, resp_range_limits, plot3d_regr_opts)
+        CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))
+        on_load_button_clicked(w, CONFIG, resp_range_limits)
     end
-    # signal_connect(on_settings_button_clicked, settings_btn, "clicked")
+
+    signal_connect(on_settings_button_clicked, settings_btn, "clicked")
 
     showall(win)
 end
