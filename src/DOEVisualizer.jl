@@ -415,7 +415,7 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, resp_range_lim
 
     slider = parent[pos_sub...] = IntervalSlider(
         fig,
-        range = min(slider_min, ext[1]) : .05 : max(slider_max, ext[2]),
+        range = min(slider_min, ext[1]) : .01 : max(slider_max, ext[2]),
         startvalues = ext,
     )
 
