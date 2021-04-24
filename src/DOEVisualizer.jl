@@ -270,9 +270,12 @@ curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3
 # curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
 # @. multimodel_quad(x, p) = p[1] + (x[:, 1] * p[2])^2 + (x[:, 2] * p[3])^2 + (x[:, 3] * p[4])^2
 
-function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, variances, cm, ax = nothing)
+get_abs_sec(x) = abs(x.second)
+
+function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, model, cm, ax = nothing)
     colors = to_colormap(cm, 3) # lower < middle < higher variance
-    variances_colors = Dict(first.(variances) .=> colors)
+    all_means = Vector{Vector{Float32}}(undef, 3)
+    intervals = Vector{Float32}(undef, 3)
     plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
     xs = 1 : 3
     if isnothing(ax)
@@ -291,20 +294,22 @@ function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_su
         lows = ys[1:3:end]
         highs = ys[3:3:end]
         means = mean.(zip(mids, lows, highs))
-
-        col = variances_colors[var_title]
+        all_means[i] = means
+        intervals[i] = calc_interval(means)
 
         eb = errorbars!(
             ax,
             xs .+ .05 * i, mids, mids - lows, highs - mids,
             color = :black,
         )
-
+    end
+    ordered_colors = last.(sort(first.(sort(1:3 .=> intervals, by = last)) .=> colors, by = first))
+    for i = 1 : 3
         sc = plots[i] = scatterlines!(
             ax,
-            xs .+ .05 * i, means,
-            color = col,
-            markercolor = col,
+            xs .+ .05 * i, all_means[i],
+            color = ordered_colors[i],
+            markercolor = ordered_colors[i],
         )
     end
 
@@ -495,16 +500,15 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
     sym_var1 = Symbol(titles_vars[1])
     sym_var2 = Symbol(titles_vars[2])
     sym_var3 = Symbol(titles_vars[3])
-    fm1 = @eval @formula($(Symbol(titles_resps[1])) ~ $sym_var1 + $sym_var2 + $sym_var3)
-    fm2 = @eval @formula($(Symbol(titles_resps[2])) ~ $sym_var1 + $sym_var2 + $sym_var3)
-    fm3 = @eval @formula($(Symbol(titles_resps[3])) ~ $sym_var1 + $sym_var2 + $sym_var3)
+    sym_resp1 = Symbol(titles_resps[1])
+    sym_resp2 = Symbol(titles_resps[2])
+    sym_resp3 = Symbol(titles_resps[3])
+    fm1 = @eval @formula($sym_resp1 ~ $sym_var1 + $sym_var2 + $sym_var3)
+    fm2 = @eval @formula($sym_resp2 ~ $sym_var1 + $sym_var2 + $sym_var3)
+    fm3 = @eval @formula($sym_resp3 ~ $sym_var1 + $sym_var2 + $sym_var3)
     model_ols1 = lm(fm1, df)
     model_ols2 = lm(fm2, df)
     model_ols3 = lm(fm3, df)
-    get_abs_sec(x) = abs(x.second)
-    variances1 = sort!(deleteat!(coefnames(model_ols1) .=> diag(vcov(model_ols1)), 1), by = get_abs_sec)
-    variances2 = sort!(deleteat!(coefnames(model_ols2) .=> diag(vcov(model_ols2)), 1), by = get_abs_sec)
-    variances3 = sort!(deleteat!(coefnames(model_ols3) .=> diag(vcov(model_ols3)), 1), by = get_abs_sec)
 
     resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], CONFIG["plot_3d_regression_density"]
     outercut = CONFIG["plot_3d_regression_outer_cut"]
@@ -519,9 +523,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     pos_reg_cbar = (1, 1)
     pos_reg_anchor = (3, 1)
-    regr1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), variances1, cm_variances)
-    regr2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), variances2, cm_variances)
-    regr3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), variances3, cm_variances)
+    regr1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), model_ols1, cm_variances)
+    regr2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), model_ols2, cm_variances)
+    regr3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), model_ols3, cm_variances)
     regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = regr1
     regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = regr2
     regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = regr3

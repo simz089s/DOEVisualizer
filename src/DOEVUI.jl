@@ -143,6 +143,9 @@ function __init__()
     push!(menu, load_btn)
     push!(menu, settings_btn)
 
+    # resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
+    # CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))
+    # on_load_button_clicked(nothing, CONFIG, resp_range_limits)
     signal_connect(load_btn, "clicked") do w
         resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
         CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))
