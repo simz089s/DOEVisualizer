@@ -12,7 +12,7 @@ include("DOEVDBManager.jl")
 include("DOEVisualizer.jl")
 
 
-function find_csv(dir)::String
+function find_csv(dir)
     for file in readdir(dir)
         if normalize(last(file, 4), casefold = true) in (".csv", ".tsv") # Find first file that ends with .{c,t}sv (case insensitive)
             return "$dir/$file"
@@ -55,11 +55,11 @@ function on_load_button_clicked(w, CONFIG_NEW, resp_range_limits)
     CONFIG = mergewith!((v1, v2) -> isnothing(v2) ? v1 : v2, parsefile(filename_config, dicttype = Dict{String, Union{String, Number}}), CONFIG_NEW)
     filename_db = PREFIX * CONFIG["db_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
-    cm::Symbol = Symbol(CONFIG["default_colormap"])
+    cm = Symbol(CONFIG["default_colormap"])
 
-    LOCALE_TR::Dict{String, Union{String, AbstractArray{Any, 1}}} = parsefile(filename_locale, dicttype = Dict{String, Union{String, AbstractArray{Any, 1}}})
+    LOCALE_TR = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
 
-    filename_data::String = isempty(CONFIG["data_path"]) ?
+    filename_data = isempty(CONFIG["data_path"]) ?
                             open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*")) :
                             PREFIX * CONFIG["data_path"]
 
@@ -143,9 +143,9 @@ function __init__()
     push!(menu, load_btn)
     push!(menu, settings_btn)
 
-    # resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
-    # CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))
-    # on_load_button_clicked(nothing, CONFIG, resp_range_limits)
+    resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
+    CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))
+    on_load_button_clicked(nothing, CONFIG, resp_range_limits)
     signal_connect(load_btn, "clicked") do w
         resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
         CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))

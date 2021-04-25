@@ -12,5 +12,6 @@
     "plot_3d_regression_density" : 7,
     "plot_3d_regression_outer_cut" : 1,
     "plot_3d_regression_inner_cut" : 1,
+    "slider_precision" : 0.01,
     "guard_page" : ""
 }

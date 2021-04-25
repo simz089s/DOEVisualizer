@@ -179,9 +179,9 @@ version = "1.6.0"
 
 [[DataFrames]]
 deps = ["Compat", "DataAPI", "Future", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrettyTables", "Printf", "REPL", "Reexport", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
-git-tree-sha1 = "56ff5833e5b755d2db654479993e949e73606b64"
+git-tree-sha1 = "78028b8c1c5147515e0a367e6bbe679fc86ff085"
 uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-version = "1.0.0"
+version = "1.0.1"
 
 [[DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -284,9 +284,9 @@ version = "3.3.9+7"
 
 [[FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
-git-tree-sha1 = "c72c8977c378c4aacb52664f96253d7b7e97558b"
+git-tree-sha1 = "b647ed22f176a4f12eabe2afd90d19a95af2e8ca"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.7.0"
+version = "1.8.0"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays"]
@@ -637,10 +637,10 @@ deps = ["Libdl"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LogExpFunctions]]
-deps = ["DocStringExtensions"]
-git-tree-sha1 = "49c5c32deda5999d15378b64ee10f2e87831ab25"
+deps = ["DocStringExtensions", "LinearAlgebra"]
+git-tree-sha1 = "ed26854d7c2c867d143f0e07c198fc9e8b721d10"
 uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
-version = "0.2.2"
+version = "0.2.3"
 
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -744,9 +744,9 @@ version = "0.4.0"
 
 [[OffsetArrays]]
 deps = ["Adapt"]
-git-tree-sha1 = "b3dfef5f2be7d7eb0e782ba9146a5271ee426e90"
+git-tree-sha1 = "87a728aebb76220bd72855e1c85284c5fdb9774c"
 uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-version = "1.6.2"
+version = "1.7.0"
 
 [[Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -766,9 +766,9 @@ version = "1.1.1+6"
 
 [[OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "9db77584158d0ab52307f8c04f8e7c08ca76b5b3"
+git-tree-sha1 = "b9b8b8ed236998f91143938a760c2112dceeb2b4"
 uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
-version = "0.5.3+4"
+version = "0.5.4+0"
 
 [[OptimBase]]
 deps = ["NLSolversBase", "Printf", "Reexport"]
