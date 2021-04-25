@@ -396,31 +396,31 @@ function create_save_button(fig, parent, filename_save; but_lab = "Save")
 end
 
 
-function create_cm_menu(fig, parent, splots, cbars, doeplots, cm_sliders, cms; menu_prompt = "Select color palette...")
+function create_cm_menu(fig, parent, doeplots, cm_sliders, cms; menu_prompt = "Select color palette...")
     menu = Menu(
         parent,
         options = vcat("Reverse current", cms),
         prompt = menu_prompt,
     )
 
-    on(menu.selection) do sel
-        println("Select colormap -> $sel.")
-        for (splot, cbar, slider, doeplot) in zip(splots, cbars, cm_sliders, doeplots)
-            # ordered_resp = map(x -> parse(Float64, x[4:end]), splot[2].input_args[1].val)
+    on(menu.selection) do cm
+        println("Select colormap -> $cm.")
+        for (slider, doeplot) in zip(cm_sliders, doeplots)
             ordered_resp = doeplot.ptsResp
             ordered_resp_pred = doeplot.regrInterpRespPts
             ext_resp = extrema(ordered_resp)
             lims = (min(slider.interval.val[1], ext_resp[1]), max(slider.interval.val[2], ext_resp[2]))
-            if sel == "Reverse current" sel = Reverse(cbar.colormap[]) end
+            if cm == "Reverse current" cm = Reverse(doeplot.cm) end
+            doeplot.cm = cm
 
-            splot[1].colormap = sel
-            doeplot.regrPlot.attributes.colormap = sel
-            col_samp = AbstractPlotting.ColorSampler(to_colormap(sel), lims)
-            splot[1].color = [col_samp[resp] for resp in ordered_resp]
+            doeplot.scPlot.attributes.colormap = cm
+            doeplot.regrPlot.attributes.colormap = cm
+            col_samp = AbstractPlotting.ColorSampler(to_colormap(cm), lims)
+            doeplot.scPlot.attributes.color = [col_samp[resp] for resp in ordered_resp]
             doeplot.regrPlot.attributes.color = [col_samp[resp] for resp in ordered_resp_pred]
 
-            cbar.colormap = sel
-            cbar.limits = lims
+            doeplot.cbar.colormap = cm
+            doeplot.cbar.limits = lims
         end
     end
 
@@ -428,8 +428,8 @@ function create_cm_menu(fig, parent, splots, cbars, doeplots, cm_sliders, cms; m
 end
 
 
-function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, doeplot, resp_range_limits, pos_sub, slider_precision = .01)
-    scal, ext, _ = get_interval_scales(resp_df)
+function create_cm_sliders(fig, parent, doeplot, resp_range_limits, pos_sub, slider_precision = .01)
+    scal, ext, _ = get_interval_scales(doeplot.ptsResp)
     slider_min = isnothing(resp_range_limits[1]) ? ext[1] - scal : min(resp_range_limits[1], ext[1])
     slider_max = isnothing(resp_range_limits[2]) ? ext[2] + scal : max(resp_range_limits[2], ext[2])
 
@@ -446,20 +446,19 @@ function create_cm_sliders(fig, parent, resp_df, resp_plot, cbar, doeplot, resp_
     )
 
     on(slider.interval) do interval
-        # ordered_resp = map(x -> parse(Float64, x[4:end]), resp_plot[2].input_args[1].val)
         ordered_resp = doeplot.ptsResp
         ordered_resp_pred = doeplot.regrInterpRespPts
         ext = extrema(ordered_resp)
         lims = (min(slider.interval.val[1], ext[1]), max(slider.interval.val[2], ext[2]))
 
-        cm = cbar.colormap.val
-        resp_plot[1].colormap = cm
+        cm = doeplot.cm
+        doeplot.scPlot.attributes.colormap = cm
         doeplot.regrPlot.attributes.colormap = cm
         col_samp = AbstractPlotting.ColorSampler(to_colormap(cm), lims)
-        resp_plot[1].color = [col_samp[resp] for resp in ordered_resp]
+        doeplot.scPlot.attributes.color = [col_samp[resp] for resp in ordered_resp]
         doeplot.regrPlot.attributes.color = [col_samp[resp] for resp in ordered_resp_pred]
 
-        cbar.limits = lims
+        doeplot.cbar.limits = lims
     end
 
     slider, slider_lab
@@ -508,9 +507,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
     plot3 = create_plots(main_fig, lscene3, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot3, CONFIG)
     plot_sublayout[pos_plots[3]...] = lscene3
     cbar3 = doeplot3.cbar = plot_sublayout[pos_plots[3][1], pos_plots[3][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
-    cam3 = cameracontrols(lscene3.scene)
-    # cam3 = cam3d!(lscene3.scene)
 
+    cam3 = cameracontrols(lscene3.scene)#cam3d!(lscene3.scene)
     lscene1.scene.camera = lscene3.scene.camera
     lscene2.scene.camera = lscene3.scene.camera
     lscene1.scene.camera_controls[] = cam3
@@ -572,7 +570,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
     rowsize!(regress_sublayout, pos_reg_cbar[1], Relative(.03)) # For colorbar
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001)) # For colorbar labels
 
-    @info "Interpolating new points and computing predicted response..."
+    @info "Interpolating new points and computing predicted responses..."
     resp1 = df[!, titles_resps[1]]
     resp2 = df[!, titles_resps[2]]
     resp3 = df[!, titles_resps[3]]
@@ -595,10 +593,10 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
 
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
 
-    cm_slider1, cm_slider_lab1 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 1], plot1, cbar1, doeplot1, resp_range_limits[1], (2, 1:2), CONFIG["slider_precision"])
-    cm_slider2, cm_slider_lab2 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 2], plot2, cbar2, doeplot2, resp_range_limits[2], (2, 3:4), CONFIG["slider_precision"])
-    cm_slider3, cm_slider_lab3 = create_cm_sliders(main_fig, plot_sublayout, resps[!, 3], plot3, cbar3, doeplot3, resp_range_limits[3], (5, 1:2), CONFIG["slider_precision"])
-    cm_menu = create_cm_menu(main_fig, main_fig, [plot1, plot2, plot3], [cbar1, cbar2, cbar3], [doeplot1, doeplot2, doeplot3], [cm_slider1, cm_slider2, cm_slider3], cms; menu_prompt = LOCALE_TR["cm_menu_prompt"])
+    cm_slider1, cm_slider_lab1 = create_cm_sliders(main_fig, plot_sublayout, doeplot1, resp_range_limits[1], (2, 1:2), CONFIG["slider_precision"])
+    cm_slider2, cm_slider_lab2 = create_cm_sliders(main_fig, plot_sublayout, doeplot2, resp_range_limits[2], (2, 3:4), CONFIG["slider_precision"])
+    cm_slider3, cm_slider_lab3 = create_cm_sliders(main_fig, plot_sublayout, doeplot3, resp_range_limits[3], (5, 1:2), CONFIG["slider_precision"])
+    cm_menu = create_cm_menu(main_fig, main_fig, [doeplot1, doeplot2, doeplot3], [cm_slider1, cm_slider2, cm_slider3], cms; menu_prompt = LOCALE_TR["cm_menu_prompt"])
 
     button_sublayout = main_fig[1, 1:4] = grid!(hcat(save_button, cm_menu))
 
