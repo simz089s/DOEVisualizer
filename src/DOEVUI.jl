@@ -49,10 +49,10 @@ function read_data(filename)
 end
 
 
-function on_load_button_clicked(w, CONFIG_NEW, resp_range_limits)
+function on_load_button_clicked(w, CONFIG_NEW)
     PREFIX = "$(@__DIR__)/../"
     filename_config = PREFIX * "cfg/config.json"
-    CONFIG = mergewith!((v1, v2) -> isnothing(v2) ? v1 : v2, parsefile(filename_config, dicttype = Dict{String, Union{String, Number}}), CONFIG_NEW)
+    CONFIG = mergewith!((v1, v2) -> isnothing(v2) ? v1 : v2, parsefile(filename_config, dicttype = Dict{String, Union{String, Number, Vector}}), CONFIG_NEW)
     filename_db = PREFIX * CONFIG["db_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
     cm = Symbol(CONFIG["default_colormap"])
@@ -89,7 +89,7 @@ function on_load_button_clicked(w, CONFIG_NEW, resp_range_limits)
     filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(titles, '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
 
     @info "Setting up interface and plots..."; flush(stdout); flush(stderr)
-    DOEVisualizer.setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, filename_save, cm, CONFIG, LOCALE_TR)
+    DOEVisualizer.setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
 end
 
 
@@ -98,6 +98,7 @@ end
 
 
 function __init__()
+    CONFIG = parsefile("$(@__DIR__)/../cfg/config.json")
     margin_space = 15
 
     win = GtkWindow("DoE Visualizer")
@@ -115,7 +116,7 @@ function __init__()
     for row = 1 : 3
         resp_range_limits_grid[1, row + row_offset] = GtkLabel("Response $row")
         resp_range_limits_entries[row] = resp_range_limits_grid[2, row + row_offset], resp_range_limits_grid[3, row + row_offset] = GtkEntry(), GtkEntry()
-        set_gtk_property!.(resp_range_limits_entries[row], :placeholder_text, "0")
+        # set_gtk_property!.(resp_range_limits_entries[row], :placeholder_text, "0")
     end
 
     plot3d_regr_grid = grid[1, 2] = GtkGrid()
@@ -123,16 +124,15 @@ function __init__()
     set_gtk_property!(plot3d_regr_grid, :margin, margin_space)
     plot3d_regr_grid[1:3, 1] = GtkLabel("3D plot regression options")
     row_offset = 1
-    plot3d_regr_entries_info = [
-        "plot_3d_regression_density" => ("Density", "7"),
-        "plot_3d_regression_outer_cut" => ("Outer cut", "1"),
-        "plot_3d_regression_inner_cut" => ("Inner cut", "1"),
+    plot3d_regr_entries::Vector{Pair{String, Union{String, Gtk.GtkEntryLeaf}}} = [
+        "plot_3d_regression_density" => "Density",
+        "plot_3d_regression_outer_cut" => "Outer cut",
+        "plot_3d_regression_inner_cut" => "Inner cut",
     ]
-    plot3d_regr_entries = Vector{Gtk.GtkEntryLeaf}(undef, length(plot3d_regr_entries_info))
-    for (row, (_, (lab, txt))) in enumerate(plot3d_regr_entries_info)
-        plot3d_regr_grid[1, row + row_offset] = GtkLabel(lab)
-        plot3d_regr_entries[row] = plot3d_regr_grid[2:3, row + row_offset] = GtkEntry()
-        set_gtk_property!(plot3d_regr_entries[row], :placeholder_text, txt)
+    for (row, (key, txt)) in enumerate(plot3d_regr_entries)
+        plot3d_regr_grid[1, row + row_offset] = GtkLabel(txt)
+        plot3d_regr_entries[row] = _, plot3d_regr_grid[2:3, row + row_offset] = plot3d_regr_entries[row].first => GtkEntry()
+        set_gtk_property!(plot3d_regr_entries[row].second, :placeholder_text, CONFIG[key])
     end
     plot3d_regr_grid[2:3, 5] = GtkLabel("You must have (outer cut + inner cut < density)")
 
@@ -143,13 +143,13 @@ function __init__()
     push!(menu, load_btn)
     push!(menu, settings_btn)
 
-    resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
-    CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))
-    on_load_button_clicked(nothing, CONFIG, resp_range_limits)
+    # get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
+    # foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
+    # on_load_button_clicked(nothing, CONFIG)
     signal_connect(load_btn, "clicked") do w
-        resp_range_limits = [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries]
-        CONFIG = Dict(first.(plot3d_regr_entries_info) .=> tryparse.(Int32, get_gtk_property.(plot3d_regr_entries, :text, String)))
-        on_load_button_clicked(w, CONFIG, resp_range_limits)
+        get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
+        foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
+        on_load_button_clicked(w, CONFIG)
     end
 
     signal_connect(on_settings_button_clicked, settings_btn, "clicked")

@@ -465,7 +465,7 @@ function create_cm_sliders(fig, parent, doeplot, resp_range_limits, pos_sub, sli
 end
 
 
-function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, filename_save, cm, CONFIG, LOCALE_TR)
+function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
     titles_vars = names(vars)
     titles_resps = names(resps)
     pos_fig = (2, 1:4)
@@ -473,6 +473,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
     if cm ∉ cms pushfirst!(cms, cm) end
     cm_variances = Symbol(CONFIG["colormap_variance_comparison"])
     cm_regr3d = Symbol(CONFIG["colormap_3d_regression"])
+    resp_range_limits = CONFIG["resp_range_limits"]
 
     doeplot1 = DoePlot()
     doeplot2 = DoePlot()
@@ -497,22 +498,25 @@ function setup(df, titles, vars, resps, num_vars, num_resps, resp_range_limits, 
     plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot1, CONFIG)
     plot_sublayout[pos_plots[1]...] = lscene1
     cbar1 = doeplot1.cbar = plot_sublayout[pos_plots[1][1], pos_plots[1][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
-
+    # cam1 = lscene1.scene.camera
+    
     lscene2 = doeplot2.lscene =  basic_ls(main_fig, pos_fig, title)
     plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot2, CONFIG)
     plot_sublayout[pos_plots[2]...] = lscene2
     cbar2 = doeplot2.cbar = plot_sublayout[pos_plots[2][1], pos_plots[2][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
+    # cam2 = lscene2.scene.camera
 
     lscene3 = doeplot3.lscene =  basic_ls(main_fig, pos_fig, title)
     plot3 = create_plots(main_fig, lscene3, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot3, CONFIG)
     plot_sublayout[pos_plots[3]...] = lscene3
     cbar3 = doeplot3.cbar = plot_sublayout[pos_plots[3][1], pos_plots[3][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
+    # cam3 = lscene3.scene.camera
 
-    cam3 = cameracontrols(lscene3.scene)#cam3d!(lscene3.scene)
+    camc3 = cameracontrols(lscene3.scene)#cam3d!(lscene3.scene)
     lscene1.scene.camera = lscene3.scene.camera
     lscene2.scene.camera = lscene3.scene.camera
-    lscene1.scene.camera_controls[] = cam3
-    lscene2.scene.camera_controls[] = cam3
+    lscene1.scene.camera_controls[] = camc3
+    lscene2.scene.camera_controls[] = camc3
 
     lscenes = [lscene1, lscene2, lscene3]
 
