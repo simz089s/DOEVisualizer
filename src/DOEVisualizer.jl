@@ -28,7 +28,7 @@ mutable struct DoePlot <: AbstractDoE
     regrInterpRespPts::Vector{Real}
     regrPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
     cbar::AbstractPlotting.MakieLayout.Colorbar
-    cm::Union{Symbol, String}
+    cm::Union{Symbol, String, AbstractPlotting.Reverse}
     gridPos::Union{Tuple, CartesianIndex}
     DoePlot() = new()
 end
@@ -575,13 +575,13 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     rowsize!(regress_sublayout, pos_reg_cbar[1] + 1, Relative(.001)) # For colorbar labels
 
     @info "Interpolating new points and computing predicted responses..."
-    resp1 = df[!, titles_resps[1]]
-    resp2 = df[!, titles_resps[2]]
-    resp3 = df[!, titles_resps[3]]
+    resp1 = doeplot1.ptsResp
+    resp2 = doeplot2.ptsResp
+    resp3 = doeplot3.ptsResp
     resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols1)...)
     resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols2)...)
     resp_pred3 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols3)...)
-    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp_pred1)); marker = marker, markersize = markersize)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
     plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
     plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
 
