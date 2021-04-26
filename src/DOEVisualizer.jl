@@ -4,7 +4,7 @@ module DOEVisualizer
 @info "Loading libraries..."
 
 using Statistics, LinearAlgebra
-using DataFrames
+using Parameters, DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, MultivariateStats, LsqFit
 # using Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
@@ -18,13 +18,12 @@ abstract type AbstractDoE end
 
 mutable struct DoePlot <: AbstractDoE
     lscene::AbstractPlotting.MakieLayout.LScene
-    ptsVars::Array
+    ptsVars::Matrix{Real}
     ptsResp::Vector{Real}
     scPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
     scAnnot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Annotations}
-    # scGrid::AbstractPlotting.ScatterLines
-    regrModel::Union{StatsModels.TableRegressionModel, LinearModel, Vector, Matrix}
-    regrInterpVarsPts::Array
+    regrModel::Union{StatsModels.TableRegressionModel, Vector, Matrix}
+    regrInterpVarsPts::Matrix{Real}
     regrInterpRespPts::Vector{Real}
     regrPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
     cbar::AbstractPlotting.MakieLayout.Colorbar
@@ -34,20 +33,20 @@ mutable struct DoePlot <: AbstractDoE
 end
 
 
-function peek(thing)
-    println(fieldnames(typeof(thing)))
-    println(thing)
-end
-
+peek(thing) = println("FIELDNAMES : $(fieldnames(typeof(thing)))\nTHING : $thing")
 
 calc_interval(a) = abs(-(extrema(a)...))
 
+get_interval_scales(a) = calc_interval(a), extrema(a) # For min-max scaling/unity-based normalization
 
-function get_interval_scales(a)
-    scal = calc_interval(a)
-    ext = extrema(a)
-    scal, ext, ext ./ scal # For min-max scaling/unity-based normalization
-end
+create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
+
+curvef(x1, x2, x3, c1, c2, c3, intercept = 1; p1 = 1, p2 = 1, p3 = 1) = intercept + c1*x1^p1 + c2*x2^p2 + c3*x3^p3
+curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3 = 1)
+# @. multimodel_lin(x, p) = curvef_lin(x[:, 1], x[:, 2], x[:, 3], p...)
+# @. multimodel_lin(x, p) = 1 + (x[:, 1] * p[2]) + (x[:, 2] * p[3]) + (x[:, 3] * p[4])
+# curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
+# @. multimodel_quad(x, p) = p[1] + (x[:, 1] * p[2])^2 + (x[:, 2] * p[3])^2 + (x[:, 3] * p[4])^2
 
 
 function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :circle, markersize = 80)
@@ -151,9 +150,6 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit, marke
 end
 
 
-create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
-
-
 function create_colorbar(fig, parent, vals, title, cm)
     vals = sort(vals[!, 1])
     n = length(vals)
@@ -223,9 +219,12 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
     # The data is min-max scaled/unity-based normalized equidistant cube (orthogonal array)
     # "Real" 3D instead of isometric projection however
 
-    interval_x, ext_x, scal_ext_x = get_interval_scales(x)
-    interval_y, ext_y, scal_ext_y = get_interval_scales(y)
-    interval_z, ext_z, scal_ext_z = get_interval_scales(z)
+    interval_x, ext_x = get_interval_scales(x)
+    interval_y, ext_y = get_interval_scales(y)
+    interval_z, ext_z = get_interval_scales(z)
+    scal_ext_x = ext_x ./ interval_x
+    scal_ext_y = ext_y ./ interval_y
+    scal_ext_z = ext_z ./ interval_z
 
     scal_x = x / interval_x
     scal_y = y / interval_y
@@ -278,15 +277,6 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
     plot_pts
 end
 
-
-curvef(x1, x2, x3, c1, c2, c3, intercept = 1; p1 = 1, p2 = 1, p3 = 1) = intercept + c1*x1^p1 + c2*x2^p2 + c3*x3^p3
-curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3 = 1)
-# @. multimodel_lin(x, p) = curvef_lin(x[:, 1], x[:, 2], x[:, 3], p...)
-# @. multimodel_lin(x, p) = 1 + (x[:, 1] * p[2]) + (x[:, 2] * p[3]) + (x[:, 3] * p[4])
-# curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
-# @. multimodel_quad(x, p) = p[1] + (x[:, 1] * p[2])^2 + (x[:, 2] * p[3])^2 + (x[:, 3] * p[4])^2
-
-get_abs_sec(x) = abs(x.second)
 
 function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, model, cm, ax = nothing)
     colors = to_colormap(cm, 3) # lower < middle < higher variance
@@ -344,35 +334,25 @@ end
 
 
 # Interpolate data with linear range, create cartesian product and reshape for plotting
-function interp_pairings(x, y, z, len, inner = false, outerval = 1, innerval = 0)
+function interp_pairings(x, y, z, len, outercut = 1, innercut = 0)
     len = max(3, isodd(len) ? len : len - 1)
+    mid = ceil(Int, len / 2)
     pairings =
-        if inner
-            mid = ceil(Int, len / 2)
-            view(
-                reshape(collect(Iterators.product(
-                    deleteat!(collect(range(extrema(x)..., length = len)), mid-innerval:mid+innerval)[begin + outerval : end - outerval],
-                    deleteat!(collect(range(extrema(y)..., length = len)), mid-innerval:mid+innerval)[begin + outerval : end - outerval],
-                    deleteat!(collect(range(extrema(z)..., length = len)), mid-innerval:mid+innerval)[begin + outerval : end - outerval],
-                )), (len - 2outerval - 2innerval - 1)^3, 1, 1),
-            :, 1, 1)
-        else
-            view(
-                reshape(collect(Iterators.product(
-                    range(extrema(x)..., length = len),
-                    range(extrema(y)..., length = len),
-                    range(extrema(z)..., length = len),
-                )), len^3, 1, 1),
-            :, 1, 1)
-        end
+        view(
+            reshape(collect(Iterators.product(
+                deleteat!(collect(range(extrema(x)..., length = len)[1 + outercut : len - outercut]), mid - innercut : mid + innercut),
+                deleteat!(collect(range(extrema(y)..., length = len)[1 + outercut : len - outercut]), mid - innercut : mid + innercut),
+                deleteat!(collect(range(extrema(z)..., length = len)[1 + outercut : len - outercut]), mid - innercut : mid + innercut),
+            )), (len - 2outercut - 2innercut - 1)^3, 1, 1),
+        :, 1, 1)
+        # view(
+        #     reshape(collect(Iterators.product(
+        #         range(extrema(x)..., length = len),
+        #         range(extrema(y)..., length = len),
+        #         range(extrema(z)..., length = len),
+        #     )), len^3, 1, 1),
+        # :, 1, 1)
     first.(pairings), getindex.(pairings, 2), last.(pairings)
-end
-
-
-function loading_bar()
-    # fig = Figure()
-    display(Figure()) # Triggers built-in loading bar for some reason ¯\_(¬_¬)_/¯
-    # fig
 end
 
 
@@ -429,7 +409,7 @@ end
 
 
 function create_cm_sliders(fig, parent, doeplot, resp_range_limits, pos_sub, slider_precision = .01)
-    scal, ext, _ = get_interval_scales(doeplot.ptsResp)
+    scal, ext = get_interval_scales(doeplot.ptsResp)
     slider_min = isnothing(resp_range_limits[1]) ? ext[1] - scal : min(resp_range_limits[1], ext[1])
     slider_max = isnothing(resp_range_limits[2]) ? ext[2] + scal : max(resp_range_limits[2], ext[2])
 
@@ -546,9 +526,13 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     innercut = CONFIG["plot_3d_regression_inner_cut"]
     marker = :rect
     var1, var2, var3 = eachcol(vars)
-    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2 * density, true, outercut, innercut)
-    xrange, yrange, zrange = calc_interval(var1), calc_interval(var2), calc_interval(var3)
-    scal_x̂, scal_ŷ, scal_ẑ = x̂ / xrange, ŷ / yrange, ẑ / zrange
+    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2density, outercut, innercut)
+    xrange = calc_interval(var1)
+    yrange = calc_interval(var2)
+    zrange = calc_interval(var3)
+    scal_x̂ = x̂ / xrange
+    scal_ŷ = ŷ / yrange
+    scal_ẑ = ẑ / zrange
 
     @info "Generating comparison plots..."
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
