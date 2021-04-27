@@ -8,8 +8,10 @@ using Parameters, DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, MultivariateStats, LsqFit
 # using Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
-
+# using TableView
+# using Taro
 import Gtk: open_dialog, open_dialog_native, save_dialog, save_dialog_native, Null, GtkNullContainer, GtkFileFilter
+# using IOLogging, LoggingExtras
 
 
 @info "Loading functions..."

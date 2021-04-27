@@ -6,15 +6,21 @@ import Unicode: normalize
 import JSON: parsefile
 import CSV: File
 using DataFrames
+using Taro
+# using TableView
 using Gtk
+import Distributed: addprocs, @fetchfrom, remotecall_fetch
+# using IOLogging, LoggingExtras
 
 include("DOEVDBManager.jl")
 include("DOEVisualizer.jl")
 
+# try Taro.init() catch e if !isa(e, Taro.JavaCall.JavaCallError) throw(e) end end
 
-function find_csv(dir)
+
+function find_data_file(dir, valid_file_ext)
     for file in readdir(dir)
-        if normalize(last(file, 4), casefold = true) in (".csv", ".tsv") # Find first file that ends with .{c,t}sv (case insensitive)
+        if occursin(valid_file_ext, normalize(last(file, 4), casefold = true)) # Find first valid data file given by readdir()
             return "$dir/$file"
         end
     end
@@ -22,8 +28,14 @@ function find_csv(dir)
 end
 
 
-function read_data(filename)
-    df = DataFrame(File(filename))
+function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
+    df = if occursin(r"[ct]sv$", filename)
+        fixtype = parse
+        DataFrame(File(filename))
+    elseif occursin(r"(xlsx?)$|(ods)$", filename)
+        fixtype = convert
+        DataFrame(readxl(filename, xlssheet, xlsrange))
+    end
 
     # First row after title should be indicating if the column is a variable or response (except for test number column)
     types = map(t -> ismissing(t) ? "" : t, df[1, :])
@@ -41,7 +53,7 @@ function read_data(filename)
     delete!(df, 1) # Remove the row indicating if it is a variable or response column
     # df[!, :] = parse.(Float64, df[!, :]) # Float64 for max compatibility with libraries...
     # df[!, 1] = parse.(Int8, df[!, 1])
-    df[!, 2:end] = parse.(Float64, df[!, 2:end])
+    df[!, 2:end] = fixtype.(Float64, df[!, 2:end])
     vars = select(df, idx_vars)
     resps = select(df, idx_resps)
 
@@ -50,23 +62,28 @@ end
 
 
 function on_load_button_clicked(w, CONFIG_NEW)
+    # try Taro.init() catch e if !isa(e, Taro.JavaCall.JavaCallError) throw(e) end end
+
     PREFIX = "$(@__DIR__)/../"
     filename_config = PREFIX * "cfg/config.json"
     CONFIG = mergewith!((v1, v2) -> isnothing(v2) ? v1 : v2, parsefile(filename_config, dicttype = Dict{String, Union{String, Number, Vector}}), CONFIG_NEW)
     filename_db = PREFIX * CONFIG["db_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
     cm = Symbol(CONFIG["default_colormap"])
+    valid_file_ext = r"\.([ct]sv$|xlsx?$|ods$)"
+    xlsrange = "A3:G13"
+    xlssheet = "Sheet1"
 
     LOCALE_TR = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
 
     filename_data = isempty(CONFIG["data_path"]) ?
-                            open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*")) :
-                            PREFIX * CONFIG["data_path"]
+                    open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*.ods", "*.xls", "*.xlsx", "*")) :
+                    PREFIX * CONFIG["data_path"]
 
     if isempty(filename_db)
         flush(stdout); flush(stderr); exit("No database file found. Exiting...")
     elseif isempty(filename_data) # If empty data file path in config.json
-        filename_data = find_csv("$(@__DIR__)/../res") # or TSV
+        filename_data = find_data_file("$(@__DIR__)/../res", valid_file_ext)
     end
 
     # TODO: Implement
@@ -80,7 +97,7 @@ function on_load_button_clicked(w, CONFIG_NEW)
         @error "NOT IMPLEMENTED YET: Get data from DB when no CSV file"; flush(stdout); flush(stderr)
         exit(1)
     else
-        df, titles, vars, resps, num_vars, num_resps = read_data(filename_data)
+        df, titles, vars, resps, num_vars, num_resps = read_data(filename_data, xlsrange, xlssheet)
         # db = DOEVDBManager.setup(filename_db, splitext(basename(filename_data))[1], df)
         println("Loaded $filename_data"); flush(stdout); flush(stderr)
     end
@@ -143,13 +160,37 @@ function __init__()
     push!(menu, load_btn)
     push!(menu, settings_btn)
 
+    # sp = GtkSpinner()
+    # grid[1, 4] = sp
+    # proc_id = addprocs(1)[1]
+
     # get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
     # foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
     # on_load_button_clicked(nothing, CONFIG)
     signal_connect(load_btn, "clicked") do w
         get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
         foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
-        on_load_button_clicked(w, CONFIG)
+        try
+            on_load_button_clicked(w, CONFIG)
+        catch e
+            showerror(stderr, e)
+            # display(sprint(showerror, e, catch_backtrace()))
+        # finally
+        #     Taro.JavaCall.destroy()
+        end
+        # start(sp)
+        # @Gtk.sigatom begin
+        #     @async begin
+        #         s = @fetchfrom proc_id begin
+        #             vizGUI = Threads.@spawn on_load_button_clicked(w, CONFIG)
+        #             wait(vizGUI)
+        #         end
+        #         @Gtk.sigatom begin
+        #             stop(sp)
+        #             display("AAAAAAAAAAAAAAAA $s")
+        #         end
+        #     end
+        # end
     end
 
     signal_connect(on_settings_button_clicked, settings_btn, "clicked")
