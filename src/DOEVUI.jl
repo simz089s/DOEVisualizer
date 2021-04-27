@@ -15,8 +15,6 @@ import Distributed: addprocs, @fetchfrom, remotecall_fetch
 include("DOEVDBManager.jl")
 include("DOEVisualizer.jl")
 
-# try Taro.init() catch e if !isa(e, Taro.JavaCall.JavaCallError) throw(e) end end
-
 
 function find_data_file(dir, valid_file_ext)
     for file in readdir(dir)
@@ -61,7 +59,7 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
 end
 
 
-function on_load_button_clicked(w, CONFIG_NEW)
+function on_load_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
     # try Taro.init() catch e if !isa(e, Taro.JavaCall.JavaCallError) throw(e) end end
 
     PREFIX = "$(@__DIR__)/../"
@@ -71,8 +69,6 @@ function on_load_button_clicked(w, CONFIG_NEW)
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
     cm = Symbol(CONFIG["default_colormap"])
     valid_file_ext = r"\.([ct]sv$|xlsx?$|ods$)"
-    xlsrange = "A3:G13"
-    xlssheet = "Sheet1"
 
     LOCALE_TR = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
 
@@ -110,8 +106,8 @@ function on_load_button_clicked(w, CONFIG_NEW)
 end
 
 
-function on_settings_button_clicked(w)
-end
+# function on_settings_button_clicked(w)
+# end
 
 
 function __init__()
@@ -153,7 +149,17 @@ function __init__()
     end
     plot3d_regr_grid[2:3, 5] = GtkLabel("You must have (outer cut + inner cut < density)")
 
-    menu = grid[1, 3] = GtkButtonBox(:h)
+    spreadsheet_grid = grid[1, 3] = GtkGrid()
+    spreadsheet_grid[1, 1] = GtkLabel("Sheet name")
+    spreadsheet_grid[1, 2] = GtkLabel("Cell range")
+    spsh_sheetname = spreadsheet_grid[2, 1] = GtkEntry()
+    spsh_cellrange = spreadsheet_grid[2, 2] = GtkEntry()
+    set_gtk_property!(spsh_sheetname, :text, "Sheet1")
+    set_gtk_property!(spsh_cellrange, :placeholder_text, "A1:A1 or a1:a1 or A1:a1 or a1:A1")
+    xlsrange = get_gtk_property(spsh_sheetname, :text, String)
+    xlssheet = get_gtk_property(spsh_cellrange, :text, String)
+
+    menu = grid[1, 4] = GtkButtonBox(:h)
     set_gtk_property!(menu, :margin, 2margin_space)
     load_btn = GtkButton("Visualize")
     settings_btn = GtkButton("Settings")
@@ -166,12 +172,13 @@ function __init__()
 
     # get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
     # foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
-    # on_load_button_clicked(nothing, CONFIG)
+    # on_load_button_clicked(nothing, CONFIG, xlsrange, xlssheet)
     signal_connect(load_btn, "clicked") do w
+        if !occursin(r"[[:alpha:]]\d+:[[:alpha:]]\d+", xlsrange) xlsrange = "A1:A1" end
         get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
         foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
         try
-            on_load_button_clicked(w, CONFIG)
+            on_load_button_clicked(w, CONFIG, xlsrange, xlssheet)
         catch e
             showerror(stderr, e)
             # display(sprint(showerror, e, catch_backtrace()))
@@ -193,7 +200,7 @@ function __init__()
         # end
     end
 
-    signal_connect(on_settings_button_clicked, settings_btn, "clicked")
+    # signal_connect(on_settings_button_clicked, settings_btn, "clicked")
 
     showall(win)
 end
