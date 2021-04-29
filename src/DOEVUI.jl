@@ -1,19 +1,27 @@
 module DOEVUI
 
 
+using Distributed, Pkg
+@everywhere using Distributed, Pkg
+Pkg.activate(".")
+@everywhere Pkg.activate(".")
 import Dates: now
 import Unicode: normalize
 import JSON: parsefile
 import CSV: File
+@everywhere import CSV: File
 using DataFrames
+@everywhere using DataFrames
 using Taro
+@everywhere using Taro
 # using TableView
 using Gtk
-import Distributed: addprocs, @fetchfrom, remotecall_fetch
 # using IOLogging, LoggingExtras
 
 include("DOEVDBManager.jl")
 include("DOEVisualizer.jl")
+include("DOEXL.jl")
+@everywhere include("DOEXL.jl")
 
 
 function find_data_file(dir, valid_file_ext)
@@ -32,7 +40,10 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
         DataFrame(File(filename))
     elseif occursin(r"(xlsx?)$|(ods)$", filename)
         fixtype = convert
-        DataFrame(readxl(filename, xlssheet, xlsrange))
+        remotecall_fetch(DOEXL.read_xls, 2, filename, xlssheet, xlsrange)
+        # read_xls(filename, xlssheet, xlsrange)
+        # remotecall_wait(read_xls, 2, filename, xlssheet, xlsrange)
+        # DataFrame(readxl(filename, xlssheet, xlsrange))
     end
 
     # First row after title should be indicating if the column is a variable or response (except for test number column)
@@ -60,8 +71,6 @@ end
 
 
 function on_load_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
-    # try Taro.init() catch e if !isa(e, Taro.JavaCall.JavaCallError) throw(e) end end
-
     PREFIX = "$(@__DIR__)/../"
     filename_config = PREFIX * "cfg/config.json"
     CONFIG = mergewith!((v1, v2) -> isnothing(v2) ? v1 : v2, parsefile(filename_config, dicttype = Dict{String, Union{String, Number, Vector}}), CONFIG_NEW)
@@ -189,7 +198,7 @@ function __init__()
         # @Gtk.sigatom begin
         #     @async begin
         #         s = @fetchfrom proc_id begin
-        #             vizGUI = Threads.@spawn on_load_button_clicked(w, CONFIG)
+        #             vizGUI = Threads.@spawn on_load_button_clicked(w, CONFIG, xlsrange, xlssheet)
         #             wait(vizGUI)
         #         end
         #         @Gtk.sigatom begin
