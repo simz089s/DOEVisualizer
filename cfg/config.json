@@ -4,7 +4,7 @@
     "locale_path" :"cfg/locale_",
     "locale" : "EN",
     "default_colormap" : "RdYlGn_10",
-    "colormap_variance_comparison" : "RdYlGn_4",
+    "colormap_comparison_plots" : "RdYlGn_4",
     "colormap_3d_regression" : "RdYlGn_10",
     "plot_3d_markersize" : 50,
     "plot_3d_grid_markersize" : 45,

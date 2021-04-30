@@ -278,7 +278,7 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 end
 
 
-function create_plot_regression(fig, parent, df, titles_vars, title_resp, pos_sub, model, cm, ax = nothing)
+function create_comparison_plot(fig, parent, df, titles_vars, title_resp, pos_sub, model, cm, ax = nothing)
     colors = to_colormap(cm, 3) # lower < middle < higher variance
     all_means = Vector{Vector{Float32}}(undef, 3)
     intervals = Vector{Float32}(undef, 3)
@@ -450,7 +450,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     pos_fig = (2, 1:4)
     cms = [:RdYlGn_4, :RdYlGn_6, :RdYlGn_8, :RdYlGn_10, :redgreensplit, :diverging_gwr_55_95_c38_n256, :watermelon, :cividis]
     if cm ∉ cms pushfirst!(cms, cm) end
-    cm_variances = Symbol(CONFIG["colormap_variance_comparison"])
+    cm_comparison_plots = Symbol(CONFIG["colormap_comparison_plots"])
     cm_regr3d = Symbol(CONFIG["colormap_3d_regression"])
     resp_range_limits = CONFIG["resp_range_limits"]
 
@@ -537,9 +537,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     pos_reg_cbar = (1, 1)
     pos_reg_anchor = (3, 1)
-    regr1 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), model_ols1, cm_variances)
-    regr2 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), model_ols2, cm_variances)
-    regr3 = create_plot_regression(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), model_ols3, cm_variances)
+    regr1 = create_comparison_plot(main_fig, regress_sublayout, df, titles_vars, titles_resps[1], (pos_reg_anchor[1] + 0, pos_reg_anchor[2]), model_ols1, cm_comparison_plots)
+    regr2 = create_comparison_plot(main_fig, regress_sublayout, df, titles_vars, titles_resps[2], (pos_reg_anchor[1] + 2, pos_reg_anchor[2]), model_ols2, cm_comparison_plots)
+    regr3 = create_comparison_plot(main_fig, regress_sublayout, df, titles_vars, titles_resps[3], (pos_reg_anchor[1] + 4, pos_reg_anchor[2]), model_ols3, cm_comparison_plots)
     regress_sublayout[pos_reg_anchor[1] + 0, pos_reg_anchor[2]] = regr1
     regress_sublayout[pos_reg_anchor[1] + 2, pos_reg_anchor[2]] = regr2
     regress_sublayout[pos_reg_anchor[1] + 4, pos_reg_anchor[2]] = regr3
@@ -547,7 +547,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
         main_fig,
         label = LOCALE_TR["cbar_regr_lab"],
         limits = (1, 3),
-        colormap = cgrad(cm_variances, 3, categorical = true),
+        colormap = cgrad(cm_comparison_plots, 3, categorical = true),
         vertical = false,
         labelpadding = 5.,
         ticksize = 0.,
