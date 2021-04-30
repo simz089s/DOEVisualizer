@@ -8,7 +8,7 @@ using Parameters, DataFrames
 using GLMakie, AbstractPlotting
 using GLM#, MultivariateStats, LsqFit
 # using Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
-import Gtk: open_dialog, open_dialog_native, save_dialog, save_dialog_native, Null, GtkNullContainer, GtkFileFilter
+import Gtk: save_dialog_native
 # using IOLogging, LoggingExtras
 
 
@@ -108,7 +108,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         align = (:center, :bottom),
         justification = :center,
         space = :screen,
-        overdraw = true,
+        overdraw = false,
         visible = true,
         show_axis = true,
     )
@@ -364,8 +364,7 @@ function create_save_button(fig, parent, filename_save; but_lab = "Save")
 
     on(button.clicks) do n
         println("$(button.label[]) -> $filename_save.")
-        # filename = save_dialog_native(but_lab, Null(), (GtkFileFilter(mimetype = "text/csv"), GtkFileFilter(mimetype = "text/tsv")))
-        filename = save_dialog_native(but_lab, GtkNullContainer(), ("*.csv", "*.tsv", "*"))
+        filename = save_dialog_native(but_lab)
         fig.scene.center = false
         save(isempty(filename) ? filename_save : filename, fig.scene)
         fig.scene.center = true

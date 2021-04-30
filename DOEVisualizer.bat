@@ -1,2 +1,2 @@
 ECHO ON
-julia -i src/DOEVUI.jl --threads=2 -p 1
+julia -i src/DOEVUI.jl &:: REM #-e "using Taro; Taro.init()"
