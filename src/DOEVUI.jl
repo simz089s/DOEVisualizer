@@ -31,6 +31,10 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
         fixtype = parse
         DataFrame(File(filename))
     elseif occursin(r"xlsx$", filename)#occursin(r"xlsx?$|ods$", filename)
+        if xlsrange == "A1:A1"
+            error_dialog("You must give a valid cell range for opening XLSX files")
+            throw(ArgumentError("You must give a valid cell range for opening XLSX files"))
+        end
         fixtype = convert
         DataFrame(XLSX.readtable(filename, xlssheet, replace(xlsrange, r"\d" => ""), first_row = parse(Int, match(r"\d+", xlsrange).match))...)
         # DataFrame(readxl(filename, xlssheet, xlsrange))
@@ -123,7 +127,42 @@ function on_view_data_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
                     open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*.xlsx", "*")) :
                     PREFIX * CONFIG["data_path"]
 
-    read_data(filename_data, xlsrange, xlssheet)
+    df, titles, vars, resps, num_vars, num_resps = read_data(filename_data, xlsrange, xlssheet)
+
+    titles = replace.(titles, Ref('_' => ' '))
+    pushfirst!(titles, "Test number")
+    data_ls = GtkListStore(Int, Float64, Float64, Float64, Float64, Float64, Float64)
+    foreach(row -> push!(data_ls, Tuple(row)), eachrow(df))
+
+    data_tv = GtkTreeView(GtkTreeModel(data_ls))
+    txtRend = GtkCellRendererText()
+    data_tv_cols = map(icolTitle -> GtkTreeViewColumn(icolTitle[2], txtRend, Dict("text" => icolTitle[1] - 1)), enumerate(titles))
+    for (i, col) in enumerate(data_tv_cols)
+        GAccessor.resizable(col, true)
+        GAccessor.sort_column_id(col, i - 1)
+        GAccessor.reorderable(col, i)
+    end
+    push!(data_tv, data_tv_cols...)
+
+    data_win = GtkWindow(data_tv, "Data View")
+    showall(data_win)
+end
+
+
+function check_get_xls_opts(spsh_sheetname, spsh_cellrange)
+    xlssheet = get_gtk_property(spsh_sheetname, :text, String)
+    if isempty(xlssheet)
+        xlssheet = "Sheet1"
+    end
+
+    xlsrange = get_gtk_property(spsh_cellrange, :text, String)
+    if occursin(r"[[:alpha:]]\d+:[[:alpha:]]\d+", xlsrange)
+        uppercase(xlsrange)
+    else
+        xlsrange = "A1:A1"
+    end
+
+    xlssheet, xlsrange
 end
 
 
@@ -192,10 +231,7 @@ function __init__()
     # foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
     # on_load_button_clicked(nothing, CONFIG, "A3:G13", "Sheet1")
     signal_connect(load_btn, "clicked") do w
-        xlssheet = get_gtk_property(spsh_sheetname, :text, String)
-        xlsrange = get_gtk_property(spsh_cellrange, :text, String)
-        if isempty(xlssheet) xlssheet = "Sheet1" end
-        xlsrange = !occursin(r"[[:alpha:]]\d+:[[:alpha:]]\d+", xlsrange) ? "A1:A1" : uppercase(xlsrange)
+        xlssheet, xlsrange = check_get_xls_opts(spsh_sheetname, spsh_cellrange)
         get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
         foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
         try
@@ -208,30 +244,9 @@ function __init__()
     end
 
     signal_connect(view_data_btn, "clicked") do w
+        xlssheet, xlsrange = check_get_xls_opts(spsh_sheetname, spsh_cellrange)
         try
-            xlssheet = get_gtk_property(spsh_sheetname, :text, String)
-            xlsrange = get_gtk_property(spsh_cellrange, :text, String)
-            if isempty(xlssheet) xlssheet = "Sheet1" end
-            xlsrange = !occursin(r"[[:alpha:]]\d+:[[:alpha:]]\d+", xlsrange) ? "A1:A1" : uppercase(xlsrange)
-
-            df, titles, vars, resps, num_vars, num_resps = on_view_data_button_clicked(w, CONFIG, xlsrange, xlssheet)
-            titles = replace.(titles, Ref('_' => ' '))
-            pushfirst!(titles, "Test number")
-            data_ls = GtkListStore(Int, Float64, Float64, Float64, Float64, Float64, Float64)
-            foreach(row -> push!(data_ls, Tuple(row)), eachrow(df))
-
-            data_tv = GtkTreeView(GtkTreeModel(data_ls))
-            txtRend = GtkCellRendererText()
-            data_tv_cols = map(icolTitle -> GtkTreeViewColumn(icolTitle[2], txtRend, Dict("text" => icolTitle[1] - 1)), enumerate(titles))
-            for (i, col) in enumerate(data_tv_cols)
-                GAccessor.resizable(col, true)
-                GAccessor.sort_column_id(col, i - 1)
-                GAccessor.reorderable(col, i)
-            end
-            push!(data_tv, data_tv_cols...)
-
-            data_win = GtkWindow(data_tv, "Data View")
-            showall(data_win)
+            on_view_data_button_clicked(w, CONFIG, xlsrange, xlssheet)
         catch e
             println(stderr)
             showerror(stderr, e, catch_backtrace())
