@@ -12,7 +12,7 @@ using XLSX
 using Gtk
 # using IOLogging, LoggingExtras
 
-include("DOEVDBManager.jl")
+# include("DOEVDBManager.jl")
 include("DOEVisualizer.jl")
 
 
@@ -30,13 +30,9 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
     df = if occursin(r"[ct]sv$", filename)
         fixtype = parse
         DataFrame(File(filename))
-    elseif occursin(r"(xlsx?)$|(ods)$", filename)
+    elseif occursin(r"xlsx$", filename)#occursin(r"xlsx?$|ods$", filename)
         fixtype = convert
         DataFrame(XLSX.readtable(filename, xlssheet, replace(xlsrange, r"\d" => ""), first_row = parse(Int, match(r"\d+", xlsrange).match))...)
-        # @show DataFrame(XLSX.gettable(XLSX.readxlsx(filename)[xlssheet])...)
-        # XLSX.openxlsx(filename) do xf
-        #     @show DataFrame(XLSX.gettable(xf[xlssheet])...)
-        # end
         # DataFrame(readxl(filename, xlssheet, xlsrange))
     end
 
@@ -54,9 +50,8 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
     titles = replace.(names(df), " " => "_")
     rename!(df, titles)
     delete!(df, 1) # Remove the row indicating if it is a variable or response column
-    # df[!, :] = parse.(Float64, df[!, :]) # Float64 for max compatibility with libraries...
-    # df[!, 1] = parse.(Int8, df[!, 1])
-    df[!, 2:end] = fixtype.(Float64, df[!, 2:end])
+    # df[!, 1] = trunc.(Int, df[!, 1])
+    df[!, 2:end] = fixtype.(Float64, df[!, 2:end]) # Float64 for max compatibility with libraries...
     vars = select(df, idx_vars)
     resps = select(df, idx_resps)
 
@@ -71,7 +66,8 @@ function on_load_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
     filename_db = PREFIX * CONFIG["db_path"]
     filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
     cm = Symbol(CONFIG["default_colormap"])
-    valid_file_ext = r"\.([ct]sv$|xlsx?$|ods$)"
+    # valid_file_ext = r"\.([ct]sv$|xlsx?$|ods$)"
+    valid_file_ext = r"\.([ct]sv$|xlsx$)"
 
     LOCALE_TR = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
 
@@ -83,7 +79,8 @@ function on_load_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
     if isempty(filename_db)
         flush(stdout); flush(stderr); exit("No database file found. Exiting...")
     elseif isempty(filename_data) # If empty data file path in config.json
-        return#filename_data = find_data_file("$(@__DIR__)/../res", valid_file_ext)
+        # filename_data = find_data_file("$(@__DIR__)/../res", valid_file_ext)
+        return
     end
 
     # TODO: Implement
@@ -103,20 +100,37 @@ function on_load_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
     end
     # display(df_test)
 
-    filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(titles, '-')).png", r"[^a-zA-Z0-9_\-\.]" => '_'))
+    filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(titles, '-')).png", r"\W|\." => '_'))
 
     @info "Setting up interface and plots..."; flush(stdout); flush(stderr)
     DOEVisualizer.setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
 end
 
 
-# function on_settings_button_clicked(w)
-# end
+function on_view_data_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
+    PREFIX = "$(@__DIR__)/../"
+    filename_config = PREFIX * "cfg/config.json"
+    CONFIG = mergewith!((v1, v2) -> isnothing(v2) ? v1 : v2, parsefile(filename_config, dicttype = Dict{String, Union{String, Number, Vector}}), CONFIG_NEW)
+    # filename_db = PREFIX * CONFIG["db_path"]
+    filename_locale = PREFIX * CONFIG["locale_path"] * CONFIG["locale"] * ".json"
+    # valid_file_ext = r"\.([ct]sv$|xlsx?$|ods$)"
+    valid_file_ext = r"\.([ct]sv$|xlsx$)"
+
+    LOCALE_TR = parsefile(filename_locale, dicttype = Dict{String, Union{String, Array{Any, 1}}})
+
+    filename_data = isempty(CONFIG["data_path"]) ?
+                    # open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*.ods", "*.xls", "*.xlsx", "*")) :
+                    open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*.xlsx", "*")) :
+                    PREFIX * CONFIG["data_path"]
+
+    read_data(filename_data, xlsrange, xlssheet)
+end
 
 
 function __init__()
     CONFIG = parsefile("$(@__DIR__)/../cfg/config.json")
     margin_space = 15
+    margin_space_small = margin_space / 3
 
     win = GtkWindow("DoE Visualizer")
 
@@ -124,6 +138,7 @@ function __init__()
     push!(win, grid)
 
     resp_range_limits_grid = grid[1, 1] = GtkGrid()
+    set_gtk_property!(resp_range_limits_grid, :row_spacing, margin_space_small)
     set_gtk_property!(resp_range_limits_grid, :column_spacing, margin_space)
     set_gtk_property!(resp_range_limits_grid, :margin, margin_space)
     resp_range_limits_grid[1:3, 1] = GtkLabel("Response range limits")
@@ -137,6 +152,7 @@ function __init__()
     end
 
     plot3d_regr_grid = grid[1, 2] = GtkGrid()
+    set_gtk_property!(plot3d_regr_grid, :row_spacing, margin_space_small)
     set_gtk_property!(plot3d_regr_grid, :column_spacing, margin_space)
     set_gtk_property!(plot3d_regr_grid, :margin, margin_space)
     plot3d_regr_grid[1:3, 1] = GtkLabel("3D plot regression options")
@@ -154,19 +170,23 @@ function __init__()
     plot3d_regr_grid[2:3, 5] = GtkLabel("You must have (outer cut + inner cut < density)")
 
     spreadsheet_grid = grid[1, 3] = GtkGrid()
-    spreadsheet_grid[1, 1] = GtkLabel("Sheet name")
-    spreadsheet_grid[1, 2] = GtkLabel("Cell range")
-    spsh_sheetname = spreadsheet_grid[2, 1] = GtkEntry()
-    spsh_cellrange = spreadsheet_grid[2, 2] = GtkEntry()
+    set_gtk_property!(spreadsheet_grid, :row_spacing, margin_space_small)
+    set_gtk_property!(spreadsheet_grid, :column_spacing, margin_space)
+    set_gtk_property!(spreadsheet_grid, :margin, margin_space)
+    spreadsheet_grid[1:2, 1] = GtkLabel("Spreadsheet selection options")
+    spreadsheet_grid[1, 2] = GtkLabel("Sheet name")
+    spreadsheet_grid[1, 3] = GtkLabel("Cell range")
+    spsh_sheetname = spreadsheet_grid[2, 2] = GtkEntry()
+    spsh_cellrange = spreadsheet_grid[2, 3] = GtkEntry()
     set_gtk_property!(spsh_sheetname, :text, "Sheet1")
-    set_gtk_property!(spsh_cellrange, :placeholder_text, "A1:A1 or a1:a1 or A1:a1 or a1:A1")
+    set_gtk_property!(spsh_cellrange, :placeholder_text, "e.g. A1:B2")
 
     menu = grid[1, 4] = GtkButtonBox(:h)
     set_gtk_property!(menu, :margin, 2margin_space)
     load_btn = GtkButton("Visualize")
-    settings_btn = GtkButton("Settings")
+    view_data_btn = GtkButton("View data")
     push!(menu, load_btn)
-    push!(menu, settings_btn)
+    push!(menu, view_data_btn)
 
     # get!(CONFIG, "resp_range_limits", [tryparse.(Float64, get_gtk_property.(resp_range_limits, :text, String)) for resp_range_limits in resp_range_limits_entries])
     # foreach(p -> let (key, entry) = p; CONFIG[key] = tryparse(Int32, get_gtk_property(entry, :text, String)) end, plot3d_regr_entries)
@@ -181,13 +201,43 @@ function __init__()
         try
             on_load_button_clicked(w, CONFIG, xlsrange, xlssheet)
         catch e
-            showerror(stderr, e); println(stderr)
-        # finally
-            # display(sprint(showerror, e, catch_backtrace()))
+            println(stderr)
+            showerror(stderr, e, catch_backtrace())
+            println(stderr)
         end
     end
 
-    # signal_connect(on_settings_button_clicked, settings_btn, "clicked")
+    signal_connect(view_data_btn, "clicked") do w
+        try
+            xlssheet = get_gtk_property(spsh_sheetname, :text, String)
+            xlsrange = get_gtk_property(spsh_cellrange, :text, String)
+            if isempty(xlssheet) xlssheet = "Sheet1" end
+            xlsrange = !occursin(r"[[:alpha:]]\d+:[[:alpha:]]\d+", xlsrange) ? "A1:A1" : uppercase(xlsrange)
+
+            df, titles, vars, resps, num_vars, num_resps = on_view_data_button_clicked(w, CONFIG, xlsrange, xlssheet)
+            titles = replace.(titles, Ref('_' => ' '))
+            pushfirst!(titles, "Test number")
+            data_ls = GtkListStore(Int, Float64, Float64, Float64, Float64, Float64, Float64)
+            foreach(row -> push!(data_ls, Tuple(row)), eachrow(df))
+
+            data_tv = GtkTreeView(GtkTreeModel(data_ls))
+            txtRend = GtkCellRendererText()
+            data_tv_cols = map(icolTitle -> GtkTreeViewColumn(icolTitle[2], txtRend, Dict("text" => icolTitle[1] - 1)), enumerate(titles))
+            for (i, col) in enumerate(data_tv_cols)
+                GAccessor.resizable(col, true)
+                GAccessor.sort_column_id(col, i - 1)
+                GAccessor.reorderable(col, i)
+            end
+            push!(data_tv, data_tv_cols...)
+
+            data_win = GtkWindow(data_tv, "Data View")
+            showall(data_win)
+        catch e
+            println(stderr)
+            showerror(stderr, e, catch_backtrace())
+            println(stderr)
+        end
+    end
 
     showall(win)
 end
