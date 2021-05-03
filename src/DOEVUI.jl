@@ -39,7 +39,7 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
             xlssheet,
             replace(xlsrange, r"\d" => ""),
             first_row = parse(Int, match(r"\d+", xlsrange).match),
-            stop_in_row_function = !ismissing, # TODO: Accept rows with missing?
+            stop_in_row_function = r -> XLSX.row_number(r) > parse(Int, match(r":[[:alpha:]]+\K\d+", xlsrange).match),
         )...)
         # DataFrame(readxl(filename, xlssheet, xlsrange))
     end
