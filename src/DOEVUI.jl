@@ -34,7 +34,13 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
             error_dialog("You must give a valid cell range for opening XLSX files")
             throw(ArgumentError("You must give a valid cell range for opening XLSX files"))
         end
-        DataFrame(XLSX.readtable(filename, xlssheet, replace(xlsrange, r"\d" => ""), first_row = parse(Int, match(r"\d+", xlsrange).match))...)
+        DataFrame(XLSX.readtable(
+            filename,
+            xlssheet,
+            replace(xlsrange, r"\d" => ""),
+            first_row = parse(Int, match(r"\d+", xlsrange).match),
+            stop_in_row_function = !ismissing, # TODO: Accept rows with missing?
+        )...)
         # DataFrame(readxl(filename, xlssheet, xlsrange))
     end
 
@@ -63,7 +69,6 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
                 convert.(Float64, df[!, i])
             end
     end
-    @show df
     vars = select(df, idx_vars)
     resps = select(df, idx_resps)
 
