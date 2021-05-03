@@ -28,14 +28,12 @@ end
 
 function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
     df = if occursin(r"[ct]sv$", filename)
-        fixtype = parse
         DataFrame(File(filename))
     elseif occursin(r"xlsx$", filename)#occursin(r"xlsx?$|ods$", filename)
         if xlsrange == "A1:A1"
             error_dialog("You must give a valid cell range for opening XLSX files")
             throw(ArgumentError("You must give a valid cell range for opening XLSX files"))
         end
-        fixtype = convert
         DataFrame(XLSX.readtable(filename, xlssheet, replace(xlsrange, r"\d" => ""), first_row = parse(Int, match(r"\d+", xlsrange).match))...)
         # DataFrame(readxl(filename, xlssheet, xlsrange))
     end
@@ -54,8 +52,18 @@ function read_data(filename, xlsrange = "A1:A1", xlssheet = "Sheet1")
     titles = replace.(names(df), " " => "_")
     rename!(df, titles)
     delete!(df, 1) # Remove the row indicating if it is a variable or response column
-    # df[!, 1] = trunc.(Int, df[!, 1])
-    df[!, 2:end] = fixtype.(Float64, df[!, 2:end]) # Float64 for max compatibility with libraries...
+    for i = 1 : ncol(df)
+        col_type = eltype(skipmissing(df[!, i]))
+        df[!, i] =
+            if col_type <: AbstractString
+                tryparse.(Float64, df[!, i])
+            elseif col_type <: Integer
+                convert.(Int, df[!, i])
+            else
+                convert.(Float64, df[!, i])
+            end
+    end
+    @show df
     vars = select(df, idx_vars)
     resps = select(df, idx_resps)
 
@@ -82,7 +90,7 @@ function on_load_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
 
     if isempty(filename_db)
         flush(stdout); flush(stderr); exit("No database file found. Exiting...")
-    elseif isempty(filename_data) # If empty data file path in config.json
+    elseif isempty(filename_data)
         # filename_data = find_data_file("$(@__DIR__)/../res", valid_file_ext)
         return
     end
@@ -126,6 +134,7 @@ function on_view_data_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
                     # open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*.ods", "*.xls", "*.xlsx", "*")) :
                     open_dialog_native(LOCALE_TR["file_dialog_window_title"], GtkNullContainer(), ("*.csv", "*.tsv", "*.xlsx", "*")) :
                     PREFIX * CONFIG["data_path"]
+    if isempty(filename_data) return end
 
     df, titles, vars, resps, num_vars, num_resps = read_data(filename_data, xlsrange, xlssheet)
 
@@ -156,11 +165,9 @@ function check_get_xls_opts(spsh_sheetname, spsh_cellrange)
     end
 
     xlsrange = get_gtk_property(spsh_cellrange, :text, String)
-    if occursin(r"[[:alpha:]]\d+:[[:alpha:]]\d+", xlsrange)
-        uppercase(xlsrange)
-    else
-        xlsrange = "A1:A1"
-    end
+    xlsrange = occursin(r"[[:alpha:]]\d+:[[:alpha:]]\d+", xlsrange) ?
+               uppercase(xlsrange) :
+               "A1:A1"
 
     xlssheet, xlsrange
 end
@@ -237,9 +244,11 @@ function __init__()
         try
             on_load_button_clicked(w, CONFIG, xlsrange, xlssheet)
         catch e
+            bt = catch_backtrace()
             println(stderr)
-            showerror(stderr, e, catch_backtrace())
+            showerror(stderr, e, bt)
             println(stderr)
+            error_dialog(sprint(showerror, e, bt)) # TODO: For dev only
         end
     end
 
@@ -248,9 +257,11 @@ function __init__()
         try
             on_view_data_button_clicked(w, CONFIG, xlsrange, xlssheet)
         catch e
+            bt = catch_backtrace()
             println(stderr)
-            showerror(stderr, e, catch_backtrace())
+            showerror(stderr, e, bt)
             println(stderr)
+            error_dialog(sprint(showerror, e, bt)) # TODO: For dev only
         end
     end
 

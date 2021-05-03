@@ -189,7 +189,6 @@ function create_table(fig, parent, df, ax = nothing)
         position = pos,
         align = (:center, :center),
         justification = :center,
-        # textsize = 1,
         space = :screen,
     )
     txtitles = text!(
@@ -198,7 +197,6 @@ function create_table(fig, parent, df, ax = nothing)
         position = [Point2(i, 0.) for i = 1 : nc],
         align = (:center, :center),
         justification = :center,
-        # textsize = 1,
         space = :screen,
     )
     hidedecorations!(ax)

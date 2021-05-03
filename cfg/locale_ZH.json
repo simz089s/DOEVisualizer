@@ -3,7 +3,7 @@
     "save_but_lab" : "保存",
     "reload_but_lab" : "重新",
     "cm_menu_prompt" : "请选择调色板",
-    "cbar_regr_lab" : "变 分数 = (x - µ) / σ",
+    "cbar_regr_lab" : "最大值和最小值之差",
     "cbar_regr_labs" : ["最低", "中间", "最高"],
     "guard_page" : ""
 }

@@ -3,7 +3,7 @@
     "save_but_lab" : "Save",
     "reload_but_lab" : "Reload",
     "cm_menu_prompt" : "Select colormap palette...",
-    "cbar_regr_lab" : "Variable Z-score = (x - µ) / σ",
+    "cbar_regr_lab" : "Difference between max and min",
     "cbar_regr_labs" : ["Lowest", "Middle", "Highest"],
     "guard_page" : ""
 }
