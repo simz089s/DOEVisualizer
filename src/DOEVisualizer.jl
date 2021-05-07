@@ -6,10 +6,12 @@ module DOEVisualizer
 using Statistics, LinearAlgebra
 using Parameters, DataFrames
 using GLMakie, AbstractPlotting
-using GLM#, MultivariateStats, LsqFit
+using GLM, MultivariateStats, LsqFit
 # using Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
 import Gtk: save_dialog_native
 # using IOLogging, LoggingExtras
+
+include("Poly.jl")
 
 
 @info "Loading functions..."
@@ -22,7 +24,7 @@ mutable struct DoePlot <: AbstractDoE
     ptsResp::Vector{Real}
     scPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
     scAnnot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Annotations}
-    regrModel::Union{StatsModels.TableRegressionModel, Vector, Matrix}
+    regrModel::Union{StatsModels.TableRegressionModel, LsqFit.LsqFitResult, Vector, Matrix}
     regrInterpVarsPts::Matrix{Real}
     regrInterpRespPts::Vector{Real}
     regrPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
@@ -45,8 +47,9 @@ curvef(x1, x2, x3, c1, c2, c3, intercept = 1; p1 = 1, p2 = 1, p3 = 1) = intercep
 curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3 = 1)
 # @. multimodel_lin(x, p) = curvef_lin(x[:, 1], x[:, 2], x[:, 3], p...)
 # @. multimodel_lin(x, p) = 1 + (x[:, 1] * p[2]) + (x[:, 2] * p[3]) + (x[:, 3] * p[4])
-# curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
-# @. multimodel_quad(x, p) = p[1] + (x[:, 1] * p[2])^2 + (x[:, 2] * p[3])^2 + (x[:, 3] * p[4])^2
+curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
+@. multimodel_quad(x, p) = curvef_quad(x[:, 1], x[:, 2], x[:, 3], p...)
+# @. multimodel_quad(x, p) = p[1] + (x[:, 1]^2 * p[2]) + (x[:, 2]^2 * p[3]) + (x[:, 3]^2 * p[4])
 
 
 function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :circle, markersize = 80)
@@ -508,12 +511,15 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     sym_resp1 = Symbol(titles_resps[1])
     sym_resp2 = Symbol(titles_resps[2])
     sym_resp3 = Symbol(titles_resps[3])
-    fm1 = @eval @formula($sym_resp1 ~ $sym_var1 + $sym_var2 + $sym_var3)
-    fm2 = @eval @formula($sym_resp2 ~ $sym_var1 + $sym_var2 + $sym_var3)
-    fm3 = @eval @formula($sym_resp3 ~ $sym_var1 + $sym_var2 + $sym_var3)
-    model_ols1 = lm(fm1, df)
-    model_ols2 = lm(fm2, df)
-    model_ols3 = lm(fm3, df)
+    # @show fm1 = @eval @formula($sym_resp1 ~ $sym_var1 + $sym_var2 + $sym_var3)
+    # @show fm2 = @eval @formula($sym_resp2 ~ $sym_var1 + $sym_var2 + $sym_var3)
+    # @show fm3 = @eval @formula($sym_resp3 ~ $sym_var1 + $sym_var2 + $sym_var3)
+    # @show model_ols1 = lm(fm1, df)
+    # @show model_ols2 = lm(fm2, df)
+    # @show model_ols3 = lm(fm3, df)
+    model_ols1 = curve_fit(multimodel_quad, Matrix(vars), resps[!, 1], fill(.5, 4))
+    model_ols2 = curve_fit(multimodel_quad, Matrix(vars), resps[!, 2], fill(.5, 4))
+    model_ols3 = curve_fit(multimodel_quad, Matrix(vars), resps[!, 3], fill(.5, 4))
     doeplot1.regrModel = model_ols1
     doeplot2.regrModel = model_ols2
     doeplot3.regrModel = model_ols3
@@ -559,9 +565,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resp1 = doeplot1.ptsResp
     resp2 = doeplot2.ptsResp
     resp3 = doeplot3.ptsResp
-    resp_pred1 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols1)...)
-    resp_pred2 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols2)...)
-    resp_pred3 = curvef_lin.(x̂, ŷ, ẑ, coef(model_ols3)...)
+    resp_pred1 = curvef_quad.(x̂, ŷ, ẑ, coef(model_ols1)...)
+    resp_pred2 = curvef_quad.(x̂, ŷ, ẑ, coef(model_ols2)...)
+    resp_pred3 = curvef_quad.(x̂, ŷ, ẑ, coef(model_ols3)...)
     plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
     plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
     plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
