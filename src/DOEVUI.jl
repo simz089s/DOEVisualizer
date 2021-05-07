@@ -117,7 +117,7 @@ function on_load_button_clicked(w, CONFIG_NEW, xlsrange, xlssheet)
     end
     # display(df_test)
 
-    filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(titles, '-')).png", r"\W|\." => '_'))
+    filename_save = string("$(@__DIR__)/../res/", replace("$(now()) $(join(titles, '-')).png", r"[^\w\.]" => '_'))
 
     @info "Setting up interface and plots..."; flush(stdout); flush(stderr)
     DOEVisualizer.setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
