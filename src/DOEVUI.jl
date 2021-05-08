@@ -219,6 +219,9 @@ function __init__()
         set_gtk_property!(plot3d_regr_entries[row].second, :placeholder_text, CONFIG[key])
     end
     plot3d_regr_grid[2:3, 5] = GtkLabel("You must have (outer cut + inner cut < density)")
+    plot3d_regr_grid[1, 6] = GtkLabel("Interaction\neffect?")
+    interact_effect_check = plot3d_regr_grid[2, 6] = GtkCheckButton("")
+    signal_connect(interact_effect_check, "toggled") do _ CONFIG["interact_effect"] = !CONFIG["interact_effect"] end
 
     spreadsheet_grid = grid[1, 3] = GtkGrid()
     set_gtk_property!(spreadsheet_grid, :row_spacing, margin_space_small)
