@@ -45,13 +45,13 @@ get_interval_scales(a) = calc_interval(a), extrema(a) # For min-max scaling/unit
 
 create_titles(lscene, axis, titles) = axis[:names, :axisnames] = replace.((titles[1], titles[2], titles[3]), "_" => " ")
 
-curvef(x1, x2, x3, c1, c2, c3, intercept = 1; p1 = 1, p2 = 1, p3 = 1) = intercept + c1*x1^p1 + c2*x2^p2 + c3*x3^p3
-curvef_lin(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 1, p2 = 1, p3 = 1)
-# @. multimodel_lin(x, p) = curvef_lin(x[:, 1], x[:, 2], x[:, 3], p...)
-# @. multimodel_lin(x, p) = 1 + (x[:, 1] * p[2]) + (x[:, 2] * p[3]) + (x[:, 3] * p[4])
-curvef_quad(x, y, z, a, b, c, d) = curvef(x, y, z, b, c, d, a; p1 = 2, p2 = 2, p3 = 2)
-@. multimodel_quad(x, p) = curvef_quad(x[:, 1], x[:, 2], x[:, 3], p...)
-# @. multimodel_quad(x, p) = p[1] + (x[:, 1]^2 * p[2]) + (x[:, 2]^2 * p[3]) + (x[:, 3]^2 * p[4])
+multimodel_lin(x1, x2, x3, c0, c1, c2, c3) = c0 + c1*x1 + c2*x2 + c3*x3
+@. multimodel_lin(x, p) = multimodel_lin(x[:, 1], x[:, 2], x[:, 3], p...)
+@. multimodel_quad(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
+                                  (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7]) +
+                                  (x[:, 1] * x[:, 2] * p[8]) * (x[:, 1] * x[:, 3] * p[9]) * (x[:, 2] * x[:, 3] * p[10])
+@. multimodel_quad_no_interact(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
+                                              (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7])
 
 
 function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :circle, markersize = 80)
@@ -353,7 +353,7 @@ end
 # For "carving/slicing out" the outer or inner sides of the cube
 function interp_pairings(x, y, z, len, outercut, innercut)
     len = max(3, isodd(len) ? len : len - 1)
-    mid = ceil(Int, len / 2)
+    mid = trunc(Int, middle(1, len - 2outercut))
     pairings =
         view(
             reshape(collect(Iterators.product(
@@ -520,15 +520,14 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     sym_resp1 = Symbol(titles_resps[1])
     sym_resp2 = Symbol(titles_resps[2])
     sym_resp3 = Symbol(titles_resps[3])
-    # @show fm1 = @eval @formula($sym_resp1 ~ $sym_var1 + $sym_var2 + $sym_var3)
-    # @show fm2 = @eval @formula($sym_resp2 ~ $sym_var1 + $sym_var2 + $sym_var3)
-    # @show fm3 = @eval @formula($sym_resp3 ~ $sym_var1 + $sym_var2 + $sym_var3)
-    # @show model_ols1 = lm(fm1, df)
-    # @show model_ols2 = lm(fm2, df)
-    # @show model_ols3 = lm(fm3, df)
-    model_ols1 = curve_fit(multimodel_quad, Matrix(vars), resps[!, 1], fill(.5, 4))
-    model_ols2 = curve_fit(multimodel_quad, Matrix(vars), resps[!, 2], fill(.5, 4))
-    model_ols3 = curve_fit(multimodel_quad, Matrix(vars), resps[!, 3], fill(.5, 4))
+    fm1 = @eval @formula($sym_resp1 ~ $sym_var1*$sym_var1 + $sym_var2*$sym_var2 + $sym_var3*$sym_var3)
+    fm2 = @eval @formula($sym_resp2 ~ $sym_var1*$sym_var1 + $sym_var2*$sym_var2 + $sym_var3*$sym_var3)
+    fm3 = @eval @formula($sym_resp3 ~ $sym_var1*$sym_var1 + $sym_var2*$sym_var2 + $sym_var3*$sym_var3)
+    p0s = fill(.5, 10)
+    interact_effect = CONFIG["interact_effect"]
+    model_ols1 = interact_effect ? curve_fit(multimodel_quad, Matrix(vars), resps[!, 1], p0s) : lm(fm1, df)
+    model_ols2 = interact_effect ? curve_fit(multimodel_quad, Matrix(vars), resps[!, 2], p0s) : lm(fm2, df)
+    model_ols3 = interact_effect ? curve_fit(multimodel_quad, Matrix(vars), resps[!, 3], p0s) : lm(fm3, df)
     doeplot1.regrModel = model_ols1
     doeplot2.regrModel = model_ols2
     doeplot3.regrModel = model_ols3
@@ -538,13 +537,14 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     innercut = CONFIG["plot_3d_regression_inner_cut"]
     marker = :rect
     var1, var2, var3 = eachcol(vars)
-    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, 3 + 2density, outercut, innercut)
+    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, density, outercut, innercut)
     xrange = calc_interval(var1)
     yrange = calc_interval(var2)
     zrange = calc_interval(var3)
     scal_x̂ = x̂ / xrange
     scal_ŷ = ŷ / yrange
     scal_ẑ = ẑ / zrange
+    doeplot1.regrInterpVarsPts = doeplot2.regrInterpVarsPts = doeplot3.regrInterpVarsPts = [x̂ ŷ ẑ]
 
     @info "Generating comparison plots..."
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
@@ -574,14 +574,14 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resp1 = doeplot1.ptsResp
     resp2 = doeplot2.ptsResp
     resp3 = doeplot3.ptsResp
-    resp_pred1 = curvef_quad.(x̂, ŷ, ẑ, coef(model_ols1)...)
-    resp_pred2 = curvef_quad.(x̂, ŷ, ẑ, coef(model_ols2)...)
-    resp_pred3 = curvef_quad.(x̂, ŷ, ẑ, coef(model_ols3)...)
+    multimodel = interact_effect ? multimodel_quad : multimodel_quad_no_interact
+    resp_pred1 = multimodel(doeplot1.regrInterpVarsPts, coef(model_ols1))
+    resp_pred2 = multimodel(doeplot2.regrInterpVarsPts, coef(model_ols2))
+    resp_pred3 = multimodel(doeplot3.regrInterpVarsPts, coef(model_ols3))
     plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
     plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
     plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
 
-    doeplot1.regrInterpVarsPts = doeplot2.regrInterpVarsPts = doeplot3.regrInterpVarsPts = [x̂ ŷ ẑ]
     doeplot1.regrInterpRespPts = resp_pred1
     doeplot2.regrInterpRespPts = resp_pred2
     doeplot3.regrInterpRespPts = resp_pred3
