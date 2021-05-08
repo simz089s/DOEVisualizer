@@ -6,8 +6,10 @@ module DOEVisualizer
 using Statistics, LinearAlgebra
 using Parameters, DataFrames
 using GLMakie, AbstractPlotting
-using GLM, MultivariateStats, LsqFit
-# using Polynomials, OnlineStats, Grassmann, Optim, Interpolations, GridInterpolations, Combinatorics, IterativeSolvers
+using GLM, LsqFit, MultivariateStats
+# using MultivariatePolynomials, Optim, IterativeSolvers, GaussianProcess, OnlineStats
+# using Interpolations, GridInterpolations
+# using Combinatorics, Grassmann
 import Gtk: save_dialog_native
 # using IOLogging, LoggingExtras
 
@@ -335,7 +337,21 @@ end
 
 
 # Interpolate data with linear range, create cartesian product and reshape for plotting
-function interp_pairings(x, y, z, len, outercut = 1, innercut = 0)
+function interp_pairings(x, y, z, len)
+    len = max(3, isodd(len) ? len : len - 1)
+    pairings =
+        view(
+            reshape(collect(Iterators.product(
+                range(extrema(x)..., length = len),
+                range(extrema(y)..., length = len),
+                range(extrema(z)..., length = len),
+            )), len^3, 1, 1),
+        :, 1, 1)
+    first.(pairings), getindex.(pairings, 2), last.(pairings)
+end
+
+# For "carving/slicing out" the outer or inner sides of the cube
+function interp_pairings(x, y, z, len, outercut, innercut)
     len = max(3, isodd(len) ? len : len - 1)
     mid = ceil(Int, len / 2)
     pairings =
@@ -346,13 +362,6 @@ function interp_pairings(x, y, z, len, outercut = 1, innercut = 0)
                 deleteat!(collect(range(extrema(z)..., length = len)[1 + outercut : len - outercut]), mid - innercut : mid + innercut),
             )), (len - 2outercut - 2innercut - 1)^3, 1, 1),
         :, 1, 1)
-        # view(
-        #     reshape(collect(Iterators.product(
-        #         range(extrema(x)..., length = len),
-        #         range(extrema(y)..., length = len),
-        #         range(extrema(z)..., length = len),
-        #     )), len^3, 1, 1),
-        # :, 1, 1)
     first.(pairings), getindex.(pairings, 2), last.(pairings)
 end
 
