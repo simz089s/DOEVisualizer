@@ -26,10 +26,10 @@ mutable struct DoePlot <: AbstractDoE
     ptsResp::Vector{Real}
     scPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
     scAnnot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Annotations}
-    regrModel::Union{StatsModels.TableRegressionModel, LsqFit.LsqFitResult, Vector, Matrix}
+    regrModel::Union{StatisticalModel, LsqFit.LsqFitResult, Array}
     regrInterpVarsPts::Matrix{Real}
     regrInterpRespPts::Vector{Real}
-    regrPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
+    regrPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.ScenePlot}
     cbar::AbstractPlotting.MakieLayout.Colorbar
     cm::Union{Symbol, String, AbstractPlotting.Reverse}
     gridPos::Union{Tuple, CartesianIndex}
@@ -53,12 +53,16 @@ multimodel_lin(x1, x2, x3, c0, c1, c2, c3) = c0 + c1*x1 + c2*x2 + c3*x3
 @. multimodel_quad_no_interact(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                               (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7])
 
+tss(glmodel::StatisticalModel) = sum(abs2, glmodel.model.rr.y .- mean(glmodel.model.rr.y))#model.mf.data.y)
+ess(glmodel::StatisticalModel) = sum(abs2, predict(glmodel) .- mean(glmodel.model.rr.y))#model.mf.data.y)
 tss(ys) = sum(abs2, ys .- mean(ys))
-r_squared(model, ys) = 1 - rss(model) / tss(ys)
+ess(ys, ŷs) = sum(abs2, ŷs .- mean(ys))
+r_squared(model::LsqFit.LsqFitResult, ys) = 1 - rss(model) / tss(ys)
+vif(glmodel::StatisticalModel) = inv(1 - r²(glmodel))
+vif(model::LsqFit.LsqFitResult, ys) = inv(1 - r_squared(model, ys))
 vif(model, ys) = inv(rss(model) / tss(ys))
-vif(model) = inv(1 - r²(model))
 vifm(X) = diag(inv(cor(X[:, 2 : end])))
-vif_GLM(glmodel) = diag(inv(cor(glmodel.model.pp.X[:, 2 : end])))
+vif_GLM(glmodel::StatisticalModel) = diag(inv(cor(glmodel.model.pp.X[:, 2 : end])))
 
 
 function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :circle, markersize = 80)
