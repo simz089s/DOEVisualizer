@@ -53,8 +53,9 @@ multimodel_lin(x1, x2, x3, c0, c1, c2, c3) = c0 + c1*x1 + c2*x2 + c3*x3
 @. multimodel_quad_no_interact(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                               (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7])
 
-r_squared(model, ys) = 1 - rss(model) / sum(abs2, ys .- mean(ys))
-vif(model, ys) = inv(rss(model) / sum(abs2, ys .- mean(ys)))
+tss(ys) = sum(abs2, ys .- mean(ys))
+r_squared(model, ys) = 1 - rss(model) / tss(ys)
+vif(model, ys) = inv(rss(model) / tss(ys))
 vif(model) = inv(1 - r²(model))
 vifm(X) = diag(inv(cor(X[:, 2 : end])))
 vif_GLM(glmodel) = diag(inv(cor(glmodel.model.pp.X[:, 2 : end])))
