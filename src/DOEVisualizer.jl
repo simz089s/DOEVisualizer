@@ -5,7 +5,7 @@ module DOEVisualizer
 
 using Statistics, LinearAlgebra
 using Parameters, DataFrames
-using GLMakie, AbstractPlotting
+using GLMakie
 using GLM, LsqFit, MultivariateStats
 # using MultivariatePolynomials, Optim, IterativeSolvers, GaussianProcess, OnlineStats
 # using Interpolations, GridInterpolations
@@ -21,17 +21,17 @@ include("Poly.jl")
 abstract type AbstractDoE end
 
 mutable struct DoePlot <: AbstractDoE
-    lscene::AbstractPlotting.MakieLayout.LScene
+    lscene::Makie.MakieLayout.LScene
     ptsVars::Matrix{Real}
     ptsResp::Vector{Real}
-    scPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Scatter}
-    scAnnot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.Annotations}
+    scPlot::Union{Makie.FigureAxisPlot, Makie.Scatter}
+    scAnnot::Union{Makie.FigureAxisPlot, Makie.Annotations}
     regrModel::Union{StatisticalModel, LsqFit.LsqFitResult, Array}
     regrInterpVarsPts::Matrix{Real}
     regrInterpRespPts::Vector{Real}
-    regrPlot::Union{AbstractPlotting.FigureAxisPlot, AbstractPlotting.ScenePlot}
-    cbar::AbstractPlotting.MakieLayout.Colorbar
-    cm::Union{Symbol, String, AbstractPlotting.Reverse}
+    regrPlot::Union{Makie.FigureAxisPlot, Makie.ScenePlot}
+    cbar::Makie.MakieLayout.Colorbar
+    cm::Union{Symbol, String, Makie.Reverse}
     gridPos::Union{Tuple, CartesianIndex}
     DoePlot() = new()
 end
@@ -259,7 +259,7 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
                           uniq_var_vals[2] / interval_y,
                           uniq_var_vals[3] / interval_z]
 
-    colors = AbstractPlotting.ColorSampler(to_colormap(cm), extrema(resp))
+    colors = Makie.ColorSampler(to_colormap(cm), extrema(resp))
 
     create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit, CONFIG["plot_3d_grid_markersize"])
 
@@ -296,7 +296,7 @@ function create_comparison_plot(fig, parent, df, titles_vars, title_resp, pos_su
     colors = to_colormap(cm, 3) # lower < middle < higher variance
     all_means = Vector{Vector{Float32}}(undef, 3)
     intervals = Vector{Float32}(undef, 3)
-    plots = Vector{AbstractPlotting.ScatterLines}(undef, 3)
+    plots = Vector{Makie.ScatterLines}(undef, 3)
     xs = 1 : 3
     if isnothing(ax)
         ax = parent[pos_sub[1], pos_sub[2]] = Axis(
@@ -415,7 +415,7 @@ function create_cm_menu(fig, parent, doeplots, cm_sliders, cms; menu_prompt = "S
 
             doeplot.scPlot.attributes.colormap = cm
             doeplot.regrPlot.attributes.colormap = cm
-            col_samp = AbstractPlotting.ColorSampler(to_colormap(cm), lims)
+            col_samp = Makie.ColorSampler(to_colormap(cm), lims)
             doeplot.scPlot.attributes.color = [col_samp[resp] for resp in ordered_resp]
             doeplot.regrPlot.attributes.color = [col_samp[resp] for resp in ordered_resp_pred]
 
@@ -454,7 +454,7 @@ function create_cm_sliders(fig, parent, doeplot, resp_range_limits, pos_sub, sli
         cm = doeplot.cm
         doeplot.scPlot.attributes.colormap = cm
         doeplot.regrPlot.attributes.colormap = cm
-        col_samp = AbstractPlotting.ColorSampler(to_colormap(cm), lims)
+        col_samp = Makie.ColorSampler(to_colormap(cm), lims)
         doeplot.scPlot.attributes.color = [col_samp[resp] for resp in ordered_resp]
         doeplot.regrPlot.attributes.color = [col_samp[resp] for resp in ordered_resp_pred]
 
@@ -589,9 +589,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resp_pred1 = multimodel(doeplot1.regrInterpVarsPts, coef(model_ols1))
     resp_pred2 = multimodel(doeplot2.regrInterpVarsPts, coef(model_ols2))
     resp_pred3 = multimodel(doeplot3.regrInterpVarsPts, coef(model_ols3))
-    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
-    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
-    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, AbstractPlotting.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
+    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
+    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
 
     doeplot1.regrInterpRespPts = resp_pred1
     doeplot2.regrInterpRespPts = resp_pred2
