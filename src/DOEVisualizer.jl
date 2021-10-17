@@ -466,6 +466,7 @@ end
 
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
+    title = "TITLE"
     titles_vars = names(vars)
     titles_resps = names(resps)
     pos_fig = (2, 1:4)
