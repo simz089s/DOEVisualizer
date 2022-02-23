@@ -68,7 +68,7 @@ vif_GLM(glmodel::StatisticalModel) = diag(inv(cor(glmodel.model.pp.X[:, 2 : end]
 function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :circle, markersize = 80)
     n = length(resp)
     scal_xyz = Array{Point3, 1}(undef, n)
-    sampled_colors = Array{RGBf0, 1}(undef, n)
+    sampled_colors = Array{RGBf, 1}(undef, n)
 
     for i = 1 : n
         scal_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i])
@@ -96,7 +96,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
     scal_xyz = Array{Point3, 1}(undef, n)
     text_xyz = Array{String, 1}(undef, n)
     pos_xyz = Array{Point3, 1}(undef, n)
-    sampled_colors = Array{RGBf0, 1}(undef, n)
+    sampled_colors = Array{RGBf, 1}(undef, n)
 
     for i = 1 : n
         scal_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i])
@@ -495,19 +495,19 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     plot_sublayout = main_fig[pos_fig...] = GridLayout()
     pos_plots = [(1, 1), (1, 3), (4, 1)]
 
-    lscene1 = doeplot1.lscene =  basic_ls(main_fig, pos_fig, title)
+    lscene1 = doeplot1.lscene = basic_ls(main_fig, pos_fig, title)
     plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot1, CONFIG)
     plot_sublayout[pos_plots[1]...] = lscene1
     cbar1 = doeplot1.cbar = plot_sublayout[pos_plots[1][1], pos_plots[1][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
     # cam1 = lscene1.scene.camera
     
-    lscene2 = doeplot2.lscene =  basic_ls(main_fig, pos_fig, title)
+    lscene2 = doeplot2.lscene = basic_ls(main_fig, pos_fig, title)
     plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot2, CONFIG)
     plot_sublayout[pos_plots[2]...] = lscene2
     cbar2 = doeplot2.cbar = plot_sublayout[pos_plots[2][1], pos_plots[2][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
     # cam2 = lscene2.scene.camera
 
-    lscene3 = doeplot3.lscene =  basic_ls(main_fig, pos_fig, title)
+    lscene3 = doeplot3.lscene = basic_ls(main_fig, pos_fig, title)
     plot3 = create_plots(main_fig, lscene3, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot3, CONFIG)
     plot_sublayout[pos_plots[3]...] = lscene3
     cbar3 = doeplot3.cbar = plot_sublayout[pos_plots[3][1], pos_plots[3][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
@@ -516,8 +516,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     camc3 = cameracontrols(lscene3.scene)#cam3d!(lscene3.scene)
     lscene1.scene.camera = lscene3.scene.camera
     lscene2.scene.camera = lscene3.scene.camera
-    lscene1.scene.camera_controls[] = camc3
-    lscene2.scene.camera_controls[] = camc3
+    lscene1.scene.camera_controls = camc3
+    lscene2.scene.camera_controls = camc3
 
     lscenes = [lscene1, lscene2, lscene3]
 
