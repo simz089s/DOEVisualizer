@@ -11,6 +11,8 @@ using GLM, LsqFit, MultivariateStats
 # using Interpolations, GridInterpolations
 # using Combinatorics, Grassmann
 import Gtk: save_dialog_native
+# import GLMakie.Makie: show_data
+
 # using IOLogging, LoggingExtras
 
 include("Poly.jl")
@@ -39,7 +41,7 @@ end
 
 peek(thing) = println("FIELDNAMES : $(fieldnames(typeof(thing)))\nTHING : $thing")
 
-calc_interval(a) = abs(-(extrema(a)...))
+calc_interval(a) = abs(-(extrema(a)...)) # TODO
 
 get_interval_scales(a) = calc_interval(a), extrema(a) # For min-max scaling/unity-based normalization
 
@@ -50,6 +52,7 @@ multimodel_lin(x1, x2, x3, c0, c1, c2, c3) = c0 + c1*x1 + c2*x2 + c3*x3
 @. multimodel_quad(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                   (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7]) +
                                   (x[:, 1] * x[:, 2] * p[8]) * (x[:, 1] * x[:, 3] * p[9]) * (x[:, 2] * x[:, 3] * p[10])
+                                  # TODO: last line of interaction terms are multiplied instead of summed??? Changing to sum yields ugly gradients...
 @. multimodel_quad_no_interact(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                               (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7])
 
@@ -465,6 +468,24 @@ function create_cm_sliders(fig, parent, doeplot, resp_range_limits, pos_sub, sli
 end
 
 
+# function show_data(inspector::DataInspector, plot::Scatter, idx)
+#     a = inspector.plot.attributes
+#     scene = GLMakie.Makie.parent_scene(plot)
+
+#     proj_pos = GLMakie.Makie.shift_project(scene, plot, to_ndim(Point3f, plot[1][][idx], 0))
+#     GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
+#     ms = plot.markersize[]
+
+#     a._display_text[] = GLMakie.Makie.position2string(plot[1][][idx])# .* (4, 40, 3))
+#     a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* ms .- Vec2f(5), Vec2f(ms) .+ Vec2f(10))
+#     a._px_bbox_visible[] = true
+#     a._bbox_visible[] = false
+#     a._visible[] = true
+
+#     return true
+# end
+
+
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
     title = "TITLE"
     titles_vars = names(vars)
@@ -475,6 +496,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     cm_comparison_plots = Symbol(CONFIG["colormap_comparison_plots"])
     cm_regr3d = Symbol(CONFIG["colormap_3d_regression"])
     resp_range_limits = CONFIG["resp_range_limits"]
+    interact_effect = CONFIG["interact_effect"]
 
     doeplot1 = DoePlot()
     doeplot2 = DoePlot()
@@ -522,7 +544,18 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     lscenes = [lscene1, lscene2, lscene3]
 
     @info "Creating data table..."
-    tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
+    tbl_ax = Axis(
+        main_fig,
+        title =
+            if interact_effect
+                "y = p₀ + p₁x₁ + p₂x₂ + p₃x₃ + p₄x₁² + p₅x₂² + p₆x₃²\n+ p₇x₁x₂ ⋅ p₈x₁x₃ ⋅ p₉x₂x₃"
+            else
+                "y = p₀ + p₁x₁ + p₂x₂ + p₃x₃ + p₄x₁² + p₅x₂² + p₆x₃²"
+            end,
+        titlesize = 24,
+        yreversed = true,
+    )
+    tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, tbl_ax, df, tbl_ax)
     plot_sublayout[4:6, 3:4] = tbl_ax
 
     @info "Performing regressions..."
@@ -536,7 +569,6 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     fm2 = @eval @formula($sym_resp2 ~ $sym_var1*$sym_var1 + $sym_var2*$sym_var2 + $sym_var3*$sym_var3)
     fm3 = @eval @formula($sym_resp3 ~ $sym_var1*$sym_var1 + $sym_var2*$sym_var2 + $sym_var3*$sym_var3)
     p0s = fill(.5, 10)
-    interact_effect = CONFIG["interact_effect"]
     model_ols1 = interact_effect ? curve_fit(multimodel_quad, Matrix(vars), resps[!, 1], p0s) : lm(fm1, df)
     model_ols2 = interact_effect ? curve_fit(multimodel_quad, Matrix(vars), resps[!, 2], p0s) : lm(fm2, df)
     model_ols3 = interact_effect ? curve_fit(multimodel_quad, Matrix(vars), resps[!, 3], p0s) : lm(fm3, df)
@@ -624,6 +656,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
         # decorated = true,
         title = "DoE Visualizer"
     )
+
+    inspector = DataInspector(main_fig)
 
     display(main_fig)
 end
