@@ -11,7 +11,7 @@ using GLM, LsqFit, MultivariateStats
 # using Interpolations, GridInterpolations
 # using Combinatorics, Grassmann
 import Gtk: save_dialog_native
-# import GLMakie.Makie: show_data
+import GLMakie.Makie: show_data
 
 # using IOLogging, LoggingExtras
 
@@ -468,22 +468,44 @@ function create_cm_sliders(fig, parent, doeplot, resp_range_limits, pos_sub, sli
 end
 
 
-# function show_data(inspector::DataInspector, plot::Scatter, idx)
-#     a = inspector.plot.attributes
-#     scene = GLMakie.Makie.parent_scene(plot)
+function show_data(inspector::DataInspector, plot::Scatter, idx)
+    a = inspector.plot.attributes
+    scene = GLMakie.Makie.parent_scene(plot)
 
-#     proj_pos = GLMakie.Makie.shift_project(scene, plot, to_ndim(Point3f, plot[1][][idx], 0))
-#     GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
-#     ms = plot.markersize[]
+    proj_pos = GLMakie.Makie.shift_project(scene, plot, to_ndim(Point3f, plot[1][][idx], 0))
+    GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
+    ms = plot.markersize[]
 
-#     a._display_text[] = GLMakie.Makie.position2string(plot[1][][idx])# .* (4, 40, 3))
-#     a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* ms .- Vec2f(5), Vec2f(ms) .+ Vec2f(10))
-#     a._px_bbox_visible[] = true
-#     a._bbox_visible[] = false
-#     a._visible[] = true
+    a._display_text[] = GLMakie.Makie.position2string(plot[1][][idx] .* (length(plot[1][][idx]) == 3 ? a.orig_vals[] : 1))
+    a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* ms .- Vec2f(5), Vec2f(ms) .+ Vec2f(10))
+    a._px_bbox_visible[] = true
+    a._bbox_visible[] = false
+    a._visible[] = true
 
-#     return true
-# end
+    return true
+end
+
+function show_data(inspector::DataInspector, plot::Union{Lines, LineSegments}, idx)
+    a = inspector.plot.attributes
+    scene = GLMakie.Makie.parent_scene(plot)
+
+    # cast ray from cursor into screen, find closest point to line
+    p0, p1 = plot[1][][idx-1:idx]
+    origin, dir = GLMakie.Makie.view_ray(scene)
+    pos = GLMakie.Makie.closest_point_on_line(p0, p1, origin, dir)
+    lw = plot.linewidth[] isa Vector ? plot.linewidth[][idx] : plot.linewidth[]
+
+    proj_pos = GLMakie.Makie.shift_project(scene, plot, to_ndim(Point3f, pos, 0))
+    GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
+
+    a._display_text[] = GLMakie.Makie.position2string(typeof(p0)(pos) .* (length(p0) == 3 ? a.orig_vals[] : 1))
+    a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* lw .- Vec2f(5), Vec2f(lw) .+ Vec2f(10))
+    a._px_bbox_visible[] = true
+    a._bbox_visible[] = false
+    a._visible[] = true
+
+    return true
+end
 
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
@@ -544,19 +566,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     lscenes = [lscene1, lscene2, lscene3]
 
     @info "Creating data table..."
-    tbl_ax = Axis(
-        main_fig,
-        title =
-            if interact_effect
-                "y = p₀ + p₁x₁ + p₂x₂ + p₃x₃ + p₄x₁² + p₅x₂² + p₆x₃²\n+ p₇x₁x₂ ⋅ p₈x₁x₃ ⋅ p₉x₂x₃"
-            else
-                "y = p₀ + p₁x₁ + p₂x₂ + p₃x₃ + p₄x₁² + p₅x₂² + p₆x₃²"
-            end,
-        titlesize = 24,
-        yreversed = true,
-    )
-    tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, tbl_ax, df, tbl_ax)
-    plot_sublayout[4:6, 3:4] = tbl_ax
+    tbl_ax, tbl_txt, tbl_titles = create_table(main_fig, main_fig, df)
+    table_sublayout = plot_sublayout[4:6, 3:4] = GridLayout(alignmode = Outside())
+    table_sublayout[1, 1] = tbl_ax
 
     @info "Performing regressions..."
     sym_var1 = Symbol(titles_vars[1])
@@ -590,6 +602,77 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     scal_ẑ = ẑ / zrange
     doeplot1.regrInterpVarsPts = doeplot2.regrInterpVarsPts = doeplot3.regrInterpVarsPts = [x̂ ŷ ẑ]
 
+    coef_model_ols1 = coef(model_ols1)
+    coef_model_ols2 = coef(model_ols2)
+    coef_model_ols3 = coef(model_ols3)
+    coef_model_ols1_round = round.(coef_model_ols1, sigdigits = 4)
+    coef_model_ols2_round = round.(coef_model_ols2, sigdigits = 4)
+    coef_model_ols3_round = round.(coef_model_ols3, sigdigits = 4)
+
+    tbl_ax.title =
+        if interact_effect
+            # y = p₀ + p₁x₁ + p₂x₂ + p₃x₃ + p₄x₁² + p₅x₂² + p₆x₃²
+            # + p₇x₁x₂ ⋅ p₈x₁x₃ ⋅ p₉x₂x₃
+            "y_$sym_resp1 ≈ " *
+            "$(coef_model_ols1_round[1]) + " *
+            "$(coef_model_ols1_round[2])x₁ + " *
+            "$(coef_model_ols1_round[3])x₂ + " *
+            "$(coef_model_ols1_round[4])x₃ + " *
+            "$(coef_model_ols1_round[5])x₁² + " *
+            "$(coef_model_ols1_round[6])x₂² + " *
+            "$(coef_model_ols1_round[7])x₃² + " *
+            "\n$(coef_model_ols1_round[8])x₁x₂ ⋅ $(coef_model_ols1_round[9])x₁x₃ ⋅ $(coef_model_ols1_round[10])x₂x₃" *
+            "\n" *
+            "y_$sym_resp2 ≈ " *
+            "$(coef_model_ols2_round[1]) + " *
+            "$(coef_model_ols2_round[2])x₁ + " *
+            "$(coef_model_ols2_round[3])x₂ + " *
+            "$(coef_model_ols2_round[4])x₃ + " *
+            "$(coef_model_ols2_round[5])x₁² + " *
+            "$(coef_model_ols2_round[6])x₂² + " *
+            "$(coef_model_ols2_round[7])x₃² + " *
+            "\n$(coef_model_ols2_round[8])x₁x₂ ⋅ $(coef_model_ols2_round[9])x₁x₃ ⋅ $(coef_model_ols2_round[10])x₂x₃" *
+            "\n" *
+            "y_$sym_resp3 ≈ " *
+            "$(coef_model_ols3_round[1]) + " *
+            "$(coef_model_ols3_round[2])x₁ + " *
+            "$(coef_model_ols3_round[3])x₂ + " *
+            "$(coef_model_ols3_round[4])x₃ + " *
+            "$(coef_model_ols3_round[5])x₁² + " *
+            "$(coef_model_ols3_round[6])x₂² + " *
+            "$(coef_model_ols3_round[7])x₃² + " *
+            "\n$(coef_model_ols3_round[8])x₁x₂ ⋅ $(coef_model_ols3_round[9])x₁x₃ ⋅ $(coef_model_ols3_round[10])x₂x₃"
+        else
+            # y = p₀ + p₁x₁ + p₂x₂ + p₃x₃ + p₄x₁² + p₅x₂² + p₆x₃²
+            "y_$sym_resp1 ≈ " *
+            "$(coef_model_ols1_round[1]) + " *
+            "$(coef_model_ols1_round[2])x₁ + " *
+            "$(coef_model_ols1_round[3])x₂ + " *
+            "$(coef_model_ols1_round[4])x₃ + " *
+            "$(coef_model_ols1_round[5])x₁² + " *
+            "$(coef_model_ols1_round[6])x₂² + " *
+            "$(coef_model_ols1_round[7])x₃² + " *
+            "\n" *
+            "y_$sym_resp2 ≈ " *
+            "$(coef_model_ols2_round[1]) + " *
+            "$(coef_model_ols2_round[2])x₁ + " *
+            "$(coef_model_ols2_round[3])x₂ + " *
+            "$(coef_model_ols2_round[4])x₃ + " *
+            "$(coef_model_ols2_round[5])x₁² + " *
+            "$(coef_model_ols2_round[6])x₂² + " *
+            "$(coef_model_ols2_round[7])x₃² + " *
+            "\n" *
+            "y_$sym_resp3 ≈ " *
+            "$(coef_model_ols3_round[1]) + " *
+            "$(coef_model_ols3_round[2])x₁ + " *
+            "$(coef_model_ols3_round[3])x₂ + " *
+            "$(coef_model_ols3_round[4])x₃ + " *
+            "$(coef_model_ols3_round[5])x₁² + " *
+            "$(coef_model_ols3_round[6])x₂² + " *
+            "$(coef_model_ols3_round[7])x₃² + "
+        end
+    # tbl_ax.titlesize = 18
+
     @info "Generating comparison plots..."
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
     pos_reg_cbar = (1, 1)
@@ -619,9 +702,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resp2 = doeplot2.ptsResp
     resp3 = doeplot3.ptsResp
     multimodel = interact_effect ? multimodel_quad : multimodel_quad_no_interact
-    resp_pred1 = multimodel(doeplot1.regrInterpVarsPts, coef(model_ols1))
-    resp_pred2 = multimodel(doeplot2.regrInterpVarsPts, coef(model_ols2))
-    resp_pred3 = multimodel(doeplot3.regrInterpVarsPts, coef(model_ols3))
+    resp_pred1 = multimodel(doeplot1.regrInterpVarsPts, coef_model_ols1)
+    resp_pred2 = multimodel(doeplot2.regrInterpVarsPts, coef_model_ols2)
+    resp_pred3 = multimodel(doeplot3.regrInterpVarsPts, coef_model_ols3)
     plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
     plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
     plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
@@ -658,6 +741,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     )
 
     inspector = DataInspector(main_fig)
+    get!(inspector.plot.attributes, :orig_vals, (xrange, yrange, zrange))
 
     display(main_fig)
 end
