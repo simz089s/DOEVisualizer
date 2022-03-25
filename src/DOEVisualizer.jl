@@ -51,7 +51,7 @@ multimodel_lin(x1, x2, x3, c0, c1, c2, c3) = c0 + c1*x1 + c2*x2 + c3*x3
 @. multimodel_lin(x, p) = multimodel_lin(x[:, 1], x[:, 2], x[:, 3], p...)
 @. multimodel_quad(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                   (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7]) +
-                                  (x[:, 1] * x[:, 2] * p[8]) * (x[:, 1] * x[:, 3] * p[9]) * (x[:, 2] * x[:, 3] * p[10])
+                                  (x[:, 1] * x[:, 2] * p[8]) + (x[:, 1] * x[:, 3] * p[9]) + (x[:, 2] * x[:, 3] * p[10])
                                   # TODO: last line of interaction terms are multiplied instead of summed??? Changing to sum yields ugly gradients...
 @. multimodel_quad_no_interact(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                               (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7])
@@ -68,7 +68,7 @@ vifm(X) = diag(inv(cor(X[:, 2 : end])))
 vif_GLM(glmodel::StatisticalModel) = diag(inv(cor(glmodel.model.pp.X[:, 2 : end])))
 
 
-function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :circle, markersize = 80)
+function create_plot3(lscene, resp, scal_x, scal_y, scal_z, title_resp, colors; marker = :circle, markersize = 80)
     n = length(resp)
     scal_xyz = Array{Point3, 1}(undef, n)
     sampled_colors = Array{RGBf, 1}(undef, n)
@@ -86,6 +86,7 @@ function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :ci
         color = sampled_colors,
         # strokecolor = sampled_colors,
         strokewidth = 0.,
+        label = title_resp,
         show_axis = true,
     )
     splot3[1][] = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
@@ -94,7 +95,7 @@ function create_plot3(lscene, resp, scal_x, scal_y, scal_z, colors; marker = :ci
 end
 
 # Draw points and coordinates
-function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors, markersize = 50)
+function create_points_coords(lscene, test_nums, resp, title_resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors, markersize = 50)
     n = nrow(test_nums)
     scal_xyz = Array{Point3, 1}(undef, n)
     text_xyz = Array{String, 1}(undef, n)
@@ -114,6 +115,7 @@ function create_points_coords(lscene, test_nums, resp, x, y, z, scal_x, scal_y, 
         marker = :circle,
         markersize = markersize,
         color = sampled_colors,
+        label = title_resp,
         show_axis = true,
     )
     splot[1].val = scal_xyz # Re-order points by re-inserting with their sorted order to match colours
@@ -137,7 +139,7 @@ end
 
 
 # Draw grid
-function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit, markersize = 45)
+function create_grid(lscene, scal_uniq_var_vals, title_resp, num_vars, scal_plot_unit, markersize = 45)
     line_data = Array{Array{Float64, 1}, 1}(undef, 3)
 
     # scal_uniq_var_vals index of the dimension that will draw the line
@@ -162,6 +164,7 @@ function create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit, marke
                 color = :black,
                 markercolor = :white,
                 markersize = markersize,
+                label = title_resp,
                 show_axis = true,
             )
         end
@@ -264,12 +267,12 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
 
     colors = Makie.ColorSampler(to_colormap(cm), extrema(resp))
 
-    create_grid(lscene, scal_uniq_var_vals, num_vars, scal_plot_unit, CONFIG["plot_3d_grid_markersize"])
+    create_grid(lscene, scal_uniq_var_vals, title_resp, num_vars, scal_plot_unit, CONFIG["plot_3d_grid_markersize"])
 
     axis = lscene.scene[OldAxis]
     axis[:showaxis] = true # TODO: Necessary?
 
-    plot_pts = create_points_coords(lscene, select(df, 1), resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors, CONFIG["plot_3d_markersize"])
+    plot_pts = create_points_coords(lscene, select(df, 1), resp, title_resp, x, y, z, scal_x, scal_y, scal_z, scal_plot_unit, colors, CONFIG["plot_3d_markersize"])
 
     doeplot.scPlot = plot_pts[1]
     doeplot.scAnnot = plot_pts[2]
@@ -379,6 +382,31 @@ function interp_pairings(x, y, z, len, outercut, innercut)
     first.(pairings), getindex.(pairings, 2), last.(pairings)
 end
 
+# For surface only
+function interp_pairings_surf(x, y, z, len)
+    len = max(3, isodd(len) ? len : len - 1)
+    len_sq = len^2
+    xyz = (x, y, z)
+    surf_points = Vector{Vector{Float64}}(undef, 3)
+    surf_points[1], surf_points[2], surf_points[3] = Vector{Float64}(), Vector{Float64}(), Vector{Float64}()
+
+    for dim_const_idx = 1 : 3
+        dim_var1_idx = mod1(dim_const_idx + 1, 3)
+        dim_var2_idx = mod1(dim_const_idx + 2, 3)
+
+        dim_var1_range = range(extrema(xyz[dim_var1_idx])..., len)
+        dim_var2_range = range(extrema(xyz[dim_var2_idx])..., len)
+        dim_var_data = Iterators.product(dim_var1_range, dim_var2_range)
+        dim_var_data_first = reshape(first.(dim_var_data), len_sq)
+        dim_var_data_last = reshape(last.(dim_var_data), len_sq)
+        dim_const_extrema = extrema(xyz[dim_const_idx])
+        surf_points[dim_const_idx] = vcat(surf_points[dim_const_idx], fill(dim_const_extrema[1], len_sq), fill(dim_const_extrema[2], len_sq))
+        surf_points[dim_var1_idx] = vcat(surf_points[dim_var1_idx], dim_var_data_first, dim_var_data_first)
+        surf_points[dim_var2_idx] = vcat(surf_points[dim_var2_idx], dim_var_data_last, dim_var_data_last)
+    end
+    surf_points[1], surf_points[2], surf_points[3]
+end
+
 
 function create_save_button(fig, parent, filename_save; but_lab = "Save")
     button = Button(
@@ -476,7 +504,28 @@ function show_data(inspector::DataInspector, plot::Scatter, idx)
     GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
     ms = plot.markersize[]
 
-    a._display_text[] = GLMakie.Makie.position2string(plot[1][][idx] .* (length(plot[1][][idx]) == 3 ? a.orig_vals[] : 1))
+    if length(plot[1][][idx]) == 3
+        title = to_value(get(plot.attributes, :label, ""))
+        display_text = GLMakie.Makie.position2string(plot[1][][idx] .* a.orig_vals[])
+        scene = plot.parent.parent
+        axis = scene[OldAxis]
+        if isnothing(axis)
+            scene = plot.parent
+            axis = scene[OldAxis]
+        end
+        if !isnothing(axis)
+            titles = scene[OldAxis][:names, :axisnames][]
+            display_text = replace(
+                display_text,
+                'x' => titles[1],
+                'y' => titles[2],
+                'z' => titles[3],
+            ) * (isempty(title) ? "" : "\n$title: ")
+        end
+        a._display_text[] = display_text
+    else
+        a._display_text[] = GLMakie.Makie.position2string(plot[1][][idx])
+    end
     a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* ms .- Vec2f(5), Vec2f(ms) .+ Vec2f(10))
     a._px_bbox_visible[] = true
     a._bbox_visible[] = false
@@ -498,7 +547,27 @@ function show_data(inspector::DataInspector, plot::Union{Lines, LineSegments}, i
     proj_pos = GLMakie.Makie.shift_project(scene, plot, to_ndim(Point3f, pos, 0))
     GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
 
-    a._display_text[] = GLMakie.Makie.position2string(typeof(p0)(pos) .* (length(p0) == 3 ? a.orig_vals[] : 1))
+    if length(p0) == 3
+        display_text = GLMakie.Makie.position2string(typeof(p0)(pos) .* a.orig_vals[])
+        scene = plot.parent.parent
+        axis = scene[OldAxis]
+        if isnothing(axis)
+            scene = plot.parent
+            axis = scene[OldAxis]
+        end
+        if !isnothing(axis)
+            titles = scene[OldAxis][:names, :axisnames][]
+            display_text = replace(
+                display_text,
+                'x' => titles[1],
+                'y' => titles[2],
+                'z' => titles[3],
+            )
+        end
+        a._display_text[] = display_text
+    else
+        a._display_text[] = GLMakie.Makie.position2string(typeof(p0)(pos))
+    end
     a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* lw .- Vec2f(5), Vec2f(lw) .+ Vec2f(10))
     a._px_bbox_visible[] = true
     a._bbox_visible[] = false
@@ -509,7 +578,6 @@ end
 
 
 function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, CONFIG, LOCALE_TR)
-    title = "TITLE"
     titles_vars = names(vars)
     titles_resps = names(resps)
     pos_fig = (2, 1:4)
@@ -539,19 +607,19 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     plot_sublayout = main_fig[pos_fig...] = GridLayout()
     pos_plots = [(1, 1), (1, 3), (4, 1)]
 
-    lscene1 = doeplot1.lscene = basic_ls(main_fig, pos_fig, title)
+    lscene1 = doeplot1.lscene = basic_ls(main_fig, pos_fig, titles_resps[1])
     plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot1, CONFIG)
     plot_sublayout[pos_plots[1]...] = lscene1
     cbar1 = doeplot1.cbar = plot_sublayout[pos_plots[1][1], pos_plots[1][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
     # cam1 = lscene1.scene.camera
     
-    lscene2 = doeplot2.lscene = basic_ls(main_fig, pos_fig, title)
+    lscene2 = doeplot2.lscene = basic_ls(main_fig, pos_fig, titles_resps[2])
     plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot2, CONFIG)
     plot_sublayout[pos_plots[2]...] = lscene2
     cbar2 = doeplot2.cbar = plot_sublayout[pos_plots[2][1], pos_plots[2][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
     # cam2 = lscene2.scene.camera
 
-    lscene3 = doeplot3.lscene = basic_ls(main_fig, pos_fig, title)
+    lscene3 = doeplot3.lscene = basic_ls(main_fig, pos_fig, titles_resps[3])
     plot3 = create_plots(main_fig, lscene3, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot3, CONFIG)
     plot_sublayout[pos_plots[3]...] = lscene3
     cbar3 = doeplot3.cbar = plot_sublayout[pos_plots[3][1], pos_plots[3][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
@@ -591,9 +659,10 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], CONFIG["plot_3d_regression_density"]
     outercut = CONFIG["plot_3d_regression_outer_cut"]
     innercut = CONFIG["plot_3d_regression_inner_cut"]
+    only_surface = CONFIG["plot_3d_regression_surface"]
     marker = :rect
     var1, var2, var3 = eachcol(vars)
-    x̂, ŷ, ẑ = interp_pairings(var1, var2, var3, density, outercut, innercut)
+    x̂, ŷ, ẑ = only_surface ? interp_pairings_surf(var1, var2, var3, density) : interp_pairings(var1, var2, var3, density, outercut, innercut)
     xrange = calc_interval(var1)
     yrange = calc_interval(var2)
     zrange = calc_interval(var3)
@@ -651,7 +720,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
             "$(coef_model_ols1_round[4])x₃ + " *
             "$(coef_model_ols1_round[5])x₁² + " *
             "$(coef_model_ols1_round[6])x₂² + " *
-            "$(coef_model_ols1_round[7])x₃² + " *
+            "$(coef_model_ols1_round[7])x₃²" *
             "\n" *
             "y_$sym_resp2 ≈ " *
             "$(coef_model_ols2_round[1]) + " *
@@ -660,7 +729,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
             "$(coef_model_ols2_round[4])x₃ + " *
             "$(coef_model_ols2_round[5])x₁² + " *
             "$(coef_model_ols2_round[6])x₂² + " *
-            "$(coef_model_ols2_round[7])x₃² + " *
+            "$(coef_model_ols2_round[7])x₃²" *
             "\n" *
             "y_$sym_resp3 ≈ " *
             "$(coef_model_ols3_round[1]) + " *
@@ -669,7 +738,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
             "$(coef_model_ols3_round[4])x₃ + " *
             "$(coef_model_ols3_round[5])x₁² + " *
             "$(coef_model_ols3_round[6])x₂² + " *
-            "$(coef_model_ols3_round[7])x₃² + "
+            "$(coef_model_ols3_round[7])x₃²"
         end
     # tbl_ax.titlesize = 18
 
@@ -705,9 +774,9 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resp_pred1 = multimodel(doeplot1.regrInterpVarsPts, coef_model_ols1)
     resp_pred2 = multimodel(doeplot2.regrInterpVarsPts, coef_model_ols2)
     resp_pred3 = multimodel(doeplot3.regrInterpVarsPts, coef_model_ols3)
-    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
-    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
-    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[1], Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
+    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[2], Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
+    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[3], Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
 
     doeplot1.regrInterpRespPts = resp_pred1
     doeplot2.regrInterpRespPts = resp_pred2
