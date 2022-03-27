@@ -505,8 +505,11 @@ function show_data(inspector::DataInspector, plot::Scatter, idx)
     ms = plot.markersize[]
 
     if length(plot[1][][idx]) == 3
-        title = to_value(get(plot.attributes, :label, ""))
-        display_text = GLMakie.Makie.position2string(plot[1][][idx] .* a.orig_vals[])
+        title = to_value(get(plot.attributes, :label) do
+            get(plot.parent.attributes, :label, "")
+        end)
+        orig_vals = plot[1][][idx] .* a.orig_vals[]
+        display_text = GLMakie.Makie.position2string(orig_vals)
         scene = plot.parent.parent
         axis = scene[OldAxis]
         if isnothing(axis)
@@ -515,12 +518,13 @@ function show_data(inspector::DataInspector, plot::Scatter, idx)
         end
         if !isnothing(axis)
             titles = scene[OldAxis][:names, :axisnames][]
+            multimodel = a.interact_effect[] ? multimodel_quad : multimodel_quad_no_interact
             display_text = replace(
                 display_text,
                 'x' => titles[1],
                 'y' => titles[2],
                 'z' => titles[3],
-            ) * (isempty(title) ? "" : "\n$title: ")
+            ) * "\n$title: $(only(multimodel(reshape(orig_vals, 1, 3), a.coefs[][title])))"
         end
         a._display_text[] = display_text
     else
@@ -548,7 +552,11 @@ function show_data(inspector::DataInspector, plot::Union{Lines, LineSegments}, i
     GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
 
     if length(p0) == 3
-        display_text = GLMakie.Makie.position2string(typeof(p0)(pos) .* a.orig_vals[])
+        title = to_value(get(plot.attributes, :label) do
+            get(plot.parent.attributes, :label, "")
+        end)
+        orig_vals = typeof(p0)(pos) .* a.orig_vals[]
+        display_text = GLMakie.Makie.position2string(orig_vals)
         scene = plot.parent.parent
         axis = scene[OldAxis]
         if isnothing(axis)
@@ -557,12 +565,13 @@ function show_data(inspector::DataInspector, plot::Union{Lines, LineSegments}, i
         end
         if !isnothing(axis)
             titles = scene[OldAxis][:names, :axisnames][]
+            multimodel = a.interact_effect[] ? multimodel_quad : multimodel_quad_no_interact
             display_text = replace(
                 display_text,
                 'x' => titles[1],
                 'y' => titles[2],
                 'z' => titles[3],
-            )
+            ) * "\n$title: $(only(multimodel(reshape(orig_vals, 1, 3), a.coefs[][title])))"
         end
         a._display_text[] = display_text
     else
@@ -741,6 +750,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
             "$(coef_model_ols3_round[7])x₃²"
         end
     # tbl_ax.titlesize = 18
+    println(tbl_ax.title[])
 
     @info "Generating comparison plots..."
     regress_sublayout = main_fig[1:pos_fig[1], pos_fig[2][end] + 1] = GridLayout()
@@ -811,6 +821,8 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
 
     inspector = DataInspector(main_fig)
     get!(inspector.plot.attributes, :orig_vals, (xrange, yrange, zrange))
+    get!(inspector.plot.attributes, :coefs, Dict(titles_resps .=> (coef_model_ols1, coef_model_ols2, coef_model_ols3)))
+    get!(inspector.plot.attributes, :interact_effect, interact_effect)
 
     display(main_fig)
 end
