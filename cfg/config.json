@@ -10,7 +10,7 @@
     "plot_3d_grid_markersize" : 45,
     "plot_3d_regression_markersize" : 20,
     "plot_3d_regression_density" : 50,
-    "plot_3d_regression_surface" : true,
+    "plot_3d_regression_surface_only" : false,
     "plot_3d_regression_outer_cut" : 1,
     "plot_3d_regression_inner_cut" : 1,
     "slider_precision" : 0.01,

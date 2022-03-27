@@ -219,8 +219,11 @@ function __init__()
         set_gtk_property!(plot3d_regr_entries[row].second, :placeholder_text, CONFIG[key])
     end
     plot3d_regr_grid[2:3, 5] = GtkLabel("You must have (outer cut + inner cut < density)")
-    plot3d_regr_grid[1, 6] = GtkLabel("Interaction\neffect?")
-    interact_effect_check = plot3d_regr_grid[2, 6] = GtkCheckButton("")
+    plot3d_regr_grid[1, 6] = GtkLabel("Surface\nonly?")
+    plot3d_regr_grid[1, 7] = GtkLabel("Interaction\neffect?")
+    plot3d_regr_surface_only_check = plot3d_regr_grid[2, 6] = GtkCheckButton("")
+    signal_connect(plot3d_regr_surface_only_check, "toggled") do _ CONFIG["plot_3d_regression_surface_only"] = !CONFIG["plot_3d_regression_surface_only"] end
+    interact_effect_check = plot3d_regr_grid[2, 7] = GtkCheckButton("")
     signal_connect(interact_effect_check, "toggled") do _ CONFIG["interact_effect"] = !CONFIG["interact_effect"] end
 
     spreadsheet_grid = grid[1, 3] = GtkGrid()

@@ -668,10 +668,10 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resolution = markersize, density = CONFIG["plot_3d_regression_markersize"], CONFIG["plot_3d_regression_density"]
     outercut = CONFIG["plot_3d_regression_outer_cut"]
     innercut = CONFIG["plot_3d_regression_inner_cut"]
-    only_surface = CONFIG["plot_3d_regression_surface"]
+    surface_only = CONFIG["plot_3d_regression_surface_only"]
     marker = :rect
     var1, var2, var3 = eachcol(vars)
-    x̂, ŷ, ẑ = only_surface ? interp_pairings_surf(var1, var2, var3, density) : interp_pairings(var1, var2, var3, density, outercut, innercut)
+    x̂, ŷ, ẑ = surface_only ? interp_pairings_surf(var1, var2, var3, density) : interp_pairings(var1, var2, var3, density, outercut, innercut)
     xrange = calc_interval(var1)
     yrange = calc_interval(var2)
     zrange = calc_interval(var3)
