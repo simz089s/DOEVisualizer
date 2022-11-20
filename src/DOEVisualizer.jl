@@ -52,7 +52,6 @@ multimodel_lin(x1, x2, x3, c0, c1, c2, c3) = c0 + c1*x1 + c2*x2 + c3*x3
 @. multimodel_quad(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                   (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7]) +
                                   (x[:, 1] * x[:, 2] * p[8]) + (x[:, 1] * x[:, 3] * p[9]) + (x[:, 2] * x[:, 3] * p[10])
-                                  # TODO: last line of interaction terms are multiplied instead of summed??? Changing to sum yields ugly gradients...
 @. multimodel_quad_no_interact(x, p) = p[1] + (x[:, 1]   * p[2]) + (x[:, 2]   * p[3]) + (x[:, 3]   * p[4]) +
                                               (x[:, 1]^2 * p[5]) + (x[:, 2]^2 * p[6]) + (x[:, 3]^2 * p[7])
 
@@ -784,9 +783,15 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     resp_pred1 = multimodel(doeplot1.regrInterpVarsPts, coef_model_ols1)
     resp_pred2 = multimodel(doeplot2.regrInterpVarsPts, coef_model_ols2)
     resp_pred3 = multimodel(doeplot3.regrInterpVarsPts, coef_model_ols3)
-    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[1], Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp1)); marker = marker, markersize = markersize)
-    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[2], Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp2)); marker = marker, markersize = markersize)
-    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[3], Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp3)); marker = marker, markersize = markersize)
+    # extrema1 = (min(minimum(resp1), minimum(resp_pred1)), max(maximum(resp1), maximum(resp_pred1)))
+    # extrema2 = (min(minimum(resp2), minimum(resp_pred2)), max(maximum(resp2), maximum(resp_pred2)))
+    # extrema3 = (min(minimum(resp3), minimum(resp_pred3)), max(maximum(resp3), maximum(resp_pred3)))
+    regr_colors1 = Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp1))#1)
+    regr_colors2 = Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp2))#2)
+    regr_colors3 = Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp3))#3)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[1], regr_colors1; marker = marker, markersize = markersize)
+    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[2], regr_colors2; marker = marker, markersize = markersize)
+    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[3], regr_colors3; marker = marker, markersize = markersize)
 
     doeplot1.regrInterpRespPts = resp_pred1
     doeplot2.regrInterpRespPts = resp_pred2
@@ -794,6 +799,16 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     doeplot1.regrPlot = plot_regr3d_1
     doeplot2.regrPlot = plot_regr3d_2
     doeplot3.regrPlot = plot_regr3d_3
+
+    # cbar1.attributes.limits = extrema1
+    # cbar2.attributes.limits = extrema2
+    # cbar3.attributes.limits = extrema3
+    # new_colors1 = map(resp -> regr_colors1[resp], resp1)
+    # new_colors2 = map(resp -> regr_colors2[resp], resp1)
+    # new_colors3 = map(resp -> regr_colors3[resp], resp1)
+    # plot1[1].attributes.color = new_colors1
+    # plot2[1].attributes.color = new_colors2
+    # plot3[1].attributes.color = new_colors3
 
     @info "Creating other widgets..."
 
