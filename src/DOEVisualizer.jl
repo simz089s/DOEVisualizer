@@ -11,7 +11,7 @@ using GLM, LsqFit, MultivariateStats
 # using Interpolations, GridInterpolations
 # using Combinatorics, Grassmann
 import Gtk: save_dialog_native
-import GLMakie.Makie: show_data
+# import GLMakie.Makie: show_data
 
 # using IOLogging, LoggingExtras
 
@@ -23,7 +23,7 @@ include("Poly.jl")
 abstract type AbstractDoE end
 
 mutable struct DoePlot <: AbstractDoE
-    lscene::Makie.MakieLayout.LScene
+    lscene::Makie.LScene
     ptsVars::Matrix{Real}
     ptsResp::Vector{Real}
     scPlot::Union{Makie.FigureAxisPlot, Makie.Scatter}
@@ -32,14 +32,14 @@ mutable struct DoePlot <: AbstractDoE
     regrInterpVarsPts::Matrix{Real}
     regrInterpRespPts::Vector{Real}
     regrPlot::Union{Makie.FigureAxisPlot, Makie.ScenePlot}
-    cbar::Makie.MakieLayout.Colorbar
+    cbar::Makie.Colorbar
     cm::Union{Symbol, String, Makie.Reverse}
     gridPos::Union{Tuple, CartesianIndex}
     DoePlot() = new()
 end
 
 
-peek(thing) = println("FIELDNAMES : $(fieldnames(typeof(thing)))\nTHING : $thing")
+peek(thing) = println("FIELDNAMES : $(fieldnames(typeof(thing)))")#\nTHING : $thing")
 
 calc_interval(a) = abs(-(extrema(a)...)) # TODO
 
@@ -67,14 +67,14 @@ vifm(X) = diag(inv(cor(X[:, 2 : end])))
 vif_GLM(glmodel::StatisticalModel) = diag(inv(cor(glmodel.model.pp.X[:, 2 : end])))
 
 
-function create_plot3(lscene, resp, scal_x, scal_y, scal_z, title_resp, colors; marker = :circle, markersize = 80)
+function create_plot3(lscene, resp, scal_x, scal_y, scal_z, title_resp, colors, col_lims; marker = :circle, markersize = 80)
     n = length(resp)
     scal_xyz = Array{Point3, 1}(undef, n)
     sampled_colors = Array{RGBf, 1}(undef, n)
 
     for i = 1 : n
         scal_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i])
-        sampled_colors[i] = colors[resp[i]]
+        sampled_colors[i] = Makie.interpolated_getindex(colors, resp[i], col_lims)
     end
 
     splot3 = scatter!(
@@ -100,12 +100,13 @@ function create_points_coords(lscene, test_nums, resp, title_resp, x, y, z, scal
     text_xyz = Array{String, 1}(undef, n)
     pos_xyz = Array{Point3, 1}(undef, n)
     sampled_colors = Array{RGBf, 1}(undef, n)
+    col_lims = extrema(resp)
 
     for i = 1 : n
         scal_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i])
         text_xyz[i] = "#$(test_nums[i, 1])\n$(resp[i])"
         pos_xyz[i] = Point3(scal_x[i], scal_y[i], scal_z[i] + .03 * scal_plot_unit)
-        sampled_colors[i] = colors[resp[i]]
+        sampled_colors[i] = Makie.interpolated_getindex(colors, resp[i], col_lims)
     end
 
     splot = scatter!(
@@ -127,7 +128,7 @@ function create_points_coords(lscene, test_nums, resp, title_resp, x, y, z, scal
         rotations = Billboard(),
         align = (:center, :bottom),
         justification = :center,
-        space = :screen,
+        space = :data,
         overdraw = false,
         visible = true,
         show_axis = true,
@@ -139,6 +140,7 @@ end
 
 # Draw grid
 function create_grid(lscene, scal_uniq_var_vals, title_resp, num_vars, scal_plot_unit, markersize = 45)
+    grid_plots = Matrix{Makie.ScatterLines}(undef, 3, 9)
     line_data = Array{Array{Float64, 1}, 1}(undef, 3)
 
     # scal_uniq_var_vals index of the dimension that will draw the line
@@ -157,7 +159,7 @@ function create_grid(lscene, scal_uniq_var_vals, title_resp, num_vars, scal_plot
             line_data[invar_data_dim_idx1] = fill(invar_val1, 3)
             line_data[invar_data_dim_idx2] = fill(invar_val2, 3)
 
-            scatterlines!(
+            grid_plots[var_dim_idx, idx] = scatterlines!(
                 lscene,
                 line_data[1], line_data[2], line_data[3],
                 color = :black,
@@ -165,9 +167,12 @@ function create_grid(lscene, scal_uniq_var_vals, title_resp, num_vars, scal_plot
                 markersize = markersize,
                 label = title_resp,
                 show_axis = true,
+                # inspectable = false,
             )
         end
     end
+
+    grid_plots
 end
 
 
@@ -203,6 +208,9 @@ function create_table(fig, parent, df, ax = nothing)
     end
     sort!(df, 1) # TODO: Sort by first column or "No_" for test number?
     data = string.(reshape(Matrix{Float64}(df), N))
+    for i in 1:nr
+        data[i] = "#" * replace(data[i], ".0" => "")
+    end
     pos = reshape([Point2(j, i) for i = 1 : nr, j = 1 : nc], N)
     txt = text!(
         ax,
@@ -210,7 +218,7 @@ function create_table(fig, parent, df, ax = nothing)
         position = pos,
         align = (:center, :center),
         justification = :center,
-        space = :screen,
+        space = :data,
     )
     txtitles = text!(
         ax,
@@ -218,7 +226,7 @@ function create_table(fig, parent, df, ax = nothing)
         position = [Point2(i, 0.) for i = 1 : nc],
         align = (:center, :center),
         justification = :center,
-        space = :screen,
+        space = :data,
     )
     hidedecorations!(ax)
     ax, txt, txtitles
@@ -264,9 +272,9 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
                           uniq_var_vals[2] / interval_y,
                           uniq_var_vals[3] / interval_z]
 
-    colors = Makie.ColorSampler(to_colormap(cm), extrema(resp))
+    colors = to_colormap(cm)
 
-    create_grid(lscene, scal_uniq_var_vals, title_resp, num_vars, scal_plot_unit, CONFIG["plot_3d_grid_markersize"])
+    plot_grids = create_grid(lscene, scal_uniq_var_vals, title_resp, num_vars, scal_plot_unit, CONFIG["plot_3d_grid_markersize"])
 
     axis = lscene.scene[OldAxis]
     axis[:showaxis] = true # TODO: Necessary?
@@ -293,12 +301,12 @@ function create_plots(fig, lscene, df, titles, title_resp, titles_vars, titles_r
     # scale!(lscene.scene, 1/interval_x, 1/interval_y, 1/interval_z)
     # axis[:scale] = [1/interval_x, 1/interval_y, 1/interval_z]
 
-    plot_pts
+    plot_pts, plot_grids
 end
 
 
 function create_comparison_plot(fig, parent, df, titles_vars, title_resp, pos_sub, model, cm, ax = nothing)
-    colors = to_colormap(cm, 3) # lower < middle < higher variance
+    colors = categorical_colors(cm, 3) # lower < middle < higher variance
     all_means = Vector{Vector{Float32}}(undef, 3)
     intervals = Vector{Float32}(undef, 3)
     plots = Vector{Makie.ScatterLines}(undef, 3)
@@ -445,9 +453,9 @@ function create_cm_menu(fig, parent, doeplots, cm_sliders, cms; menu_prompt = "S
 
             doeplot.scPlot.attributes.colormap = cm
             doeplot.regrPlot.attributes.colormap = cm
-            col_samp = Makie.ColorSampler(to_colormap(cm), lims)
-            doeplot.scPlot.attributes.color = [col_samp[resp] for resp in ordered_resp]
-            doeplot.regrPlot.attributes.color = [col_samp[resp] for resp in ordered_resp_pred]
+            col_samp = to_colormap(cm)
+            doeplot.scPlot.attributes.color = [Makie.interpolated_getindex(col_samp, resp, lims) for resp in ordered_resp]
+            doeplot.regrPlot.attributes.color = [Makie.interpolated_getindex(col_samp, resp, lims) for resp in ordered_resp_pred]
 
             doeplot.cbar.colormap = cm
             doeplot.cbar.limits = lims
@@ -484,104 +492,14 @@ function create_cm_sliders(fig, parent, doeplot, resp_range_limits, pos_sub, sli
         cm = doeplot.cm
         doeplot.scPlot.attributes.colormap = cm
         doeplot.regrPlot.attributes.colormap = cm
-        col_samp = Makie.ColorSampler(to_colormap(cm), lims)
-        doeplot.scPlot.attributes.color = [col_samp[resp] for resp in ordered_resp]
-        doeplot.regrPlot.attributes.color = [col_samp[resp] for resp in ordered_resp_pred]
+        col_samp = to_colormap(cm)
+        doeplot.scPlot.attributes.color = [Makie.interpolated_getindex(col_samp, resp, lims) for resp in ordered_resp]
+        doeplot.regrPlot.attributes.color = [Makie.interpolated_getindex(col_samp, resp, lims) for resp in ordered_resp_pred]
 
         doeplot.cbar.limits = lims
     end
 
     slider, slider_lab
-end
-
-
-function show_data(inspector::DataInspector, plot::Scatter, idx)
-    a = inspector.plot.attributes
-    scene = GLMakie.Makie.parent_scene(plot)
-
-    proj_pos = GLMakie.Makie.shift_project(scene, plot, to_ndim(Point3f, plot[1][][idx], 0))
-    GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
-    ms = plot.markersize[]
-
-    if length(plot[1][][idx]) == 3
-        title = to_value(get(plot.attributes, :label) do
-            get(plot.parent.attributes, :label, "")
-        end)
-        orig_vals = plot[1][][idx] .* a.orig_vals[]
-        display_text = GLMakie.Makie.position2string(orig_vals)
-        scene = plot.parent.parent
-        axis = scene[OldAxis]
-        if isnothing(axis)
-            scene = plot.parent
-            axis = scene[OldAxis]
-        end
-        if !isnothing(axis)
-            titles = scene[OldAxis][:names, :axisnames][]
-            multimodel = a.interact_effect[] ? multimodel_quad : multimodel_quad_no_interact
-            display_text = replace(
-                display_text,
-                'x' => titles[1],
-                'y' => titles[2],
-                'z' => titles[3],
-            ) * "\n$title: $(only(multimodel(reshape(orig_vals, 1, 3), a.coefs[][title])))"
-        end
-        a._display_text[] = display_text
-    else
-        a._display_text[] = GLMakie.Makie.position2string(plot[1][][idx])
-    end
-    a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* ms .- Vec2f(5), Vec2f(ms) .+ Vec2f(10))
-    a._px_bbox_visible[] = true
-    a._bbox_visible[] = false
-    a._visible[] = true
-
-    return true
-end
-
-function show_data(inspector::DataInspector, plot::Union{Lines, LineSegments}, idx)
-    a = inspector.plot.attributes
-    scene = GLMakie.Makie.parent_scene(plot)
-
-    # cast ray from cursor into screen, find closest point to line
-    p0, p1 = plot[1][][idx-1:idx]
-    origin, dir = GLMakie.Makie.view_ray(scene)
-    pos = GLMakie.Makie.closest_point_on_line(p0, p1, origin, dir)
-    lw = plot.linewidth[] isa Vector ? plot.linewidth[][idx] : plot.linewidth[]
-
-    proj_pos = GLMakie.Makie.shift_project(scene, plot, to_ndim(Point3f, pos, 0))
-    GLMakie.Makie.update_tooltip_alignment!(inspector, proj_pos)
-
-    if length(p0) == 3
-        title = to_value(get(plot.attributes, :label) do
-            get(plot.parent.attributes, :label, "")
-        end)
-        orig_vals = typeof(p0)(pos) .* a.orig_vals[]
-        display_text = GLMakie.Makie.position2string(orig_vals)
-        scene = plot.parent.parent
-        axis = scene[OldAxis]
-        if isnothing(axis)
-            scene = plot.parent
-            axis = scene[OldAxis]
-        end
-        if !isnothing(axis)
-            titles = scene[OldAxis][:names, :axisnames][]
-            multimodel = a.interact_effect[] ? multimodel_quad : multimodel_quad_no_interact
-            display_text = replace(
-                display_text,
-                'x' => titles[1],
-                'y' => titles[2],
-                'z' => titles[3],
-            ) * "\n$title: $(only(multimodel(reshape(orig_vals, 1, 3), a.coefs[][title])))"
-        end
-        a._display_text[] = display_text
-    else
-        a._display_text[] = GLMakie.Makie.position2string(typeof(p0)(pos))
-    end
-    a._bbox2D[] = Rect2f(proj_pos .- 0.5 .* lw .- Vec2f(5), Vec2f(lw) .+ Vec2f(10))
-    a._px_bbox_visible[] = true
-    a._bbox_visible[] = false
-    a._visible[] = true
-
-    return true
 end
 
 
@@ -606,7 +524,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     main_fig = Figure()
     basic_ls(main_fig, pos_fig, title) = LScene(
         main_fig[pos_fig...],
-        title = title,
+        # title = title,
         scenekw = (
             camera = cam3d!,
             raw = false,
@@ -616,19 +534,19 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     pos_plots = [(1, 1), (1, 3), (4, 1)]
 
     lscene1 = doeplot1.lscene = basic_ls(main_fig, pos_fig, titles_resps[1])
-    plot1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot1, CONFIG)
+    plot1, grids1 = create_plots(main_fig, lscene1, df, titles, titles_resps[1], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot1, CONFIG)
     plot_sublayout[pos_plots[1]...] = lscene1
     cbar1 = doeplot1.cbar = plot_sublayout[pos_plots[1][1], pos_plots[1][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 1), titles_resps[1], cm)
     # cam1 = lscene1.scene.camera
     
     lscene2 = doeplot2.lscene = basic_ls(main_fig, pos_fig, titles_resps[2])
-    plot2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot2, CONFIG)
+    plot2, grids2 = create_plots(main_fig, lscene2, df, titles, titles_resps[2], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot2, CONFIG)
     plot_sublayout[pos_plots[2]...] = lscene2
     cbar2 = doeplot2.cbar = plot_sublayout[pos_plots[2][1], pos_plots[2][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 2), titles_resps[2], cm)
     # cam2 = lscene2.scene.camera
 
     lscene3 = doeplot3.lscene = basic_ls(main_fig, pos_fig, titles_resps[3])
-    plot3 = create_plots(main_fig, lscene3, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot3, CONFIG)
+    plot3, grids3 = create_plots(main_fig, lscene3, df, titles, titles_resps[3], titles_vars, titles_resps, num_vars, num_resps, cm, doeplot3, CONFIG)
     plot_sublayout[pos_plots[3]...] = lscene3
     cbar3 = doeplot3.cbar = plot_sublayout[pos_plots[3][1], pos_plots[3][2] + 1] = create_colorbar(main_fig, main_fig, select(resps, 3), titles_resps[3], cm)
     # cam3 = lscene3.scene.camera
@@ -786,12 +704,10 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
     # extrema1 = (min(minimum(resp1), minimum(resp_pred1)), max(maximum(resp1), maximum(resp_pred1)))
     # extrema2 = (min(minimum(resp2), minimum(resp_pred2)), max(maximum(resp2), maximum(resp_pred2)))
     # extrema3 = (min(minimum(resp3), minimum(resp_pred3)), max(maximum(resp3), maximum(resp_pred3)))
-    regr_colors1 = Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp1))#1)
-    regr_colors2 = Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp2))#2)
-    regr_colors3 = Makie.ColorSampler(to_colormap(cm_regr3d), extrema(resp3))#3)
-    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[1], regr_colors1; marker = marker, markersize = markersize)
-    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[2], regr_colors2; marker = marker, markersize = markersize)
-    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[3], regr_colors3; marker = marker, markersize = markersize)
+    regr_colors = to_colormap(cm_regr3d)
+    plot_regr3d_1 = create_plot3(lscene1, resp_pred1, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[1], regr_colors, extrema(resp1); marker = marker, markersize = markersize)
+    plot_regr3d_2 = create_plot3(lscene2, resp_pred2, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[2], regr_colors, extrema(resp2); marker = marker, markersize = markersize)
+    plot_regr3d_3 = create_plot3(lscene3, resp_pred3, scal_x̂, scal_ŷ, scal_ẑ, titles_resps[3], regr_colors, extrema(resp3); marker = marker, markersize = markersize)
 
     doeplot1.regrInterpRespPts = resp_pred1
     doeplot2.regrInterpRespPts = resp_pred2
@@ -812,6 +728,47 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
 
     @info "Creating other widgets..."
 
+    inspector = DataInspector(main_fig)
+    # Create tooltips for real points
+    for (i, plot_resps) in enumerate((plot1, plot2, plot3) .=> (resp1, resp2, resp3))
+        get!(plot_resps.first[1].attributes, :inspector_label, (self, idx, pos) -> begin
+            pos = pos .* (xrange, yrange, zrange)
+            display_text = GLMakie.Makie.position2string(pos)
+            display_text = replace(display_text,   "x:" =>   "$(titles_vars[1]):")
+            display_text = replace(display_text, "\ny:" => "\n$(titles_vars[2]):")
+            display_text = replace(display_text, "\nz:" => "\n$(titles_vars[3]):")
+            multimodel = interact_effect ? multimodel_quad : multimodel_quad_no_interact
+            return display_text * "\n$(titles_resps[i]): $(plot_resps.second[idx])"
+        end)
+    end
+    # Create tooltips for grid point (predicted values)
+    # TODO:
+    for (i, grids_coefs) in enumerate((grids1, grids2, grids3) .=> (coef_model_ols1, coef_model_ols2, coef_model_ols3))
+        for grids in grids_coefs.first
+            get!(grids.attributes, :inspector_label, (self, idx, pos) -> begin
+                pos = pos .* (xrange, yrange, zrange)
+                display_text = GLMakie.Makie.position2string(pos)
+                display_text = replace(display_text,   "x:" =>   "$(titles_vars[1]):")
+                display_text = replace(display_text, "\ny:" => "\n$(titles_vars[2]):")
+                display_text = replace(display_text, "\nz:" => "\n$(titles_vars[3]):")
+                multimodel = interact_effect ? multimodel_quad : multimodel_quad_no_interact
+                return display_text * "\n$(titles_resps[i]): $(only(multimodel(reshape(pos, 1, 3), grids_coefs.second)))"
+            end)
+        end
+    end
+    # Create tooltips for predicted points
+    for (i, plot_coefs) in enumerate((plot_regr3d_1, plot_regr3d_2, plot_regr3d_3) .=> (coef_model_ols1, coef_model_ols2, coef_model_ols3))
+        get!(plot_coefs.first.attributes, :inspector_label, (self, idx, pos) -> begin
+            pos = pos .* (xrange, yrange, zrange)
+            display_text = GLMakie.Makie.position2string(pos)
+            display_text = replace(display_text,   "x:" =>   "$(titles_vars[1]):")
+            display_text = replace(display_text, "\ny:" => "\n$(titles_vars[2]):")
+            display_text = replace(display_text, "\nz:" => "\n$(titles_vars[3]):")
+            multimodel = interact_effect ? multimodel_quad : multimodel_quad_no_interact
+            return display_text * "\n$(titles_resps[i]): $(only(multimodel(reshape(pos, 1, 3), plot_coefs.second)))"
+        end)
+    end
+
     save_button = create_save_button(main_fig, main_fig[1, 1], filename_save; but_lab = LOCALE_TR["save_but_lab"])
 
     cm_slider1, cm_slider_lab1 = create_cm_sliders(main_fig, plot_sublayout, doeplot1, resp_range_limits[1], (2, 1:2), CONFIG["slider_precision"])
@@ -823,7 +780,7 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
 
     trim!(main_fig.layout)
 
-    set_window_config!(
+    GLMakie.activate!(;
         # renderloop = renderloop,
         # vsync = false,
         # framerate = 30.0,
@@ -833,11 +790,6 @@ function setup(df, titles, vars, resps, num_vars, num_resps, filename_save, cm, 
         # decorated = true,
         title = "DoE Visualizer"
     )
-
-    inspector = DataInspector(main_fig)
-    get!(inspector.plot.attributes, :orig_vals, (xrange, yrange, zrange))
-    get!(inspector.plot.attributes, :coefs, Dict(titles_resps .=> (coef_model_ols1, coef_model_ols2, coef_model_ols3)))
-    get!(inspector.plot.attributes, :interact_effect, interact_effect)
 
     display(main_fig)
 end
