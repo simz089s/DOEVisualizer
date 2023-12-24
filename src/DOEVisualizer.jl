@@ -15,8 +15,6 @@ import Gtk: save_dialog_native
 
 # using IOLogging, LoggingExtras
 
-include("Poly.jl")
-
 
 @info "Loading functions..."
 
