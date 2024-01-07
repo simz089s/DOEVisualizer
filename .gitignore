@@ -16,3 +16,4 @@ dub.selections.json
 *.def
 *.png
 src/Scratchpad.jl
+app/

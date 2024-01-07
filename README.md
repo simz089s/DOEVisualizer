@@ -5,6 +5,8 @@
 1. [Install Julia language](https://julialang.org/downloads/). This was tested on the Long-Term Support (LTS) version 1.6.7 but it should probably work on the newer version.
 2. Install Julia extra package dependencies:
    1. Open a terminal/command line/console/shell and go to this project's root directory/folder. So basically the directory/folder containing `Manifest.toml`, `Project.toml`, `/src`, `/cfg`, etc.
+      1. On Windows, you can use the Start Menu search bar for "Windows PowerShell" and open that.
+      2. Then type `cd C:/Users/blablablabla/Downloads/DOEVisualizer` (change the path to wherever you downloaded this folder).
    2. Open a Julia REPL/shell by running the command `julia`. The Julia executable (e.g. `julia.exe` for a Windows computer, but Julia works on Mac OS and Linux too) must be in your `PATH`.
    3. If not, you need to know where Julia was installed on the computer. Usually somewhere like `C:/Users/username/AppData/Local/Programs/Julia-1.6.7`, where `username` is your Windows accounts folder name and `Julia-1.6.7` should be replaced with your Julia version, for a Windows computer. Your computer might be different. To run Julia (open a Julia REPL/shell) this way, you would run the command `C:/Users/username/AppData/Local/Programs/Julia-1.6.7/bin/julia.exe` (replace the version number if needed). If you installed the portable version of Julia, you should probably know where the `julia.exe` is (e.g. your `/Downloads` folder).
    4. Once inside the Julia REPL/shell, type `using Pkg` and press _Enter_.
@@ -20,3 +22,11 @@
 2. You must then find and select and open the CSV or Excel spreadsheet you used.
 3. A new window will then open as the DOEVisualizer.
 4. For now, it is recommend to only manipulate (rotate with left-click, move with right-click, zoom with mouse wheel) using the bottom left (3rd) 3D plot model, as the top two ones are buggy.
+
+## More "permanent" installation (untested)
+
+1. Open Julia as explained [previously](#installation-and-running-the-app) in step 2 (2.1 to 2.5).
+2. Type `Pkg.add("PackageCompiler")` and press _Enter_.
+3. Type `using PackageCompiler` and press _Enter_.
+4. Copy the path where you downloaded the DOEVisualizer (this folder) e.g. `C:/Users/blablablabla/Downloads/DOEVisualizer`.
+5. Type `create_app(raw"C:/Users/blablablabla/Downloads/DOEVisualizer", "app")`. This will create a folder `/app` in the current folder and inside it will be an executable program (e.g. `C:/Users/blablablabla/Downloads/DOEVisualizer/app/bin/julia.exe`). Simply running that should run the DOEVisualizer.

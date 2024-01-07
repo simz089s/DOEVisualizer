@@ -279,5 +279,10 @@ function __init__()
     showall(win)
 end
 
+function julia_main()::Cint
+    __init__()
+    return 0
+end
+
 
 end
