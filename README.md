@@ -1,5 +1,8 @@
 # DOEVisualizer
 
+![2021_05_07T01_18_53 531_S_time_temperat _A_time_yield_strength_elongation](https://github.com/simz089s/DOEVisualizer/assets/24693006/92118bd6-8549-42e5-98be-79dc2bc8572d)
+![2021_05_07T01_20_32 540_S_time_temperat _A_time_yield_strength_elongation](https://github.com/simz089s/DOEVisualizer/assets/24693006/67faa528-4159-4b66-9061-ee498c2ab91b)
+
 ## Installation and running the app
 
 1. [Install Julia language](https://julialang.org/downloads/). This was tested on the Long-Term Support (LTS) version 1.6.7 but it should probably work on the newer version.
