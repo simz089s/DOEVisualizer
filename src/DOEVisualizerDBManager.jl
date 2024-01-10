@@ -1,4 +1,4 @@
-module DOEVDBManager
+module DOEVisualizerDBManager
 
 using SQLite
 using DataFrames
